@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  AGENCY
+  CLIENT
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  INTERVIEW_REQUESTED
+  OFFER_PENDING
+  OFFERED
+  DECLINED
+  CLOSED
+}
+
+enum DecisionType {
+  REQUEST_INTERVIEW
+  MAKE_OFFER
+  DECLINE
+  QUESTION
+}
+
+enum DeclineReason {
+  SKILL_MISMATCH
+  RATE_TOO_HIGH
+  NOT_AVAILABLE
+  CULTURE_FIT
+  OTHER
+}
+
+model Client {
+  id           String        @id @default(cuid())
+  name         String
+  users        User[]
+  requisitions Requisition[]
+  createdAt    DateTime      @default(now())
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  role         Role
+  // For CLIENT users, link to Client
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  // For Credentials auth
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model Requisition {
+  id           String        @id @default(cuid())
+  clientId     String
+  client       Client        @relation(fields: [clientId], references: [id])
+  title        String
+  location     String?
+  submissions  Submission[]
+  createdAt    DateTime     @default(now())
+}
+
+model Candidate {
+  id           String        @id @default(cuid())
+  firstName    String
+  lastName     String
+  title        String?
+  location     String?
+  yearsExp     Int?
+  rate         String?
+  availability String?
+  submissions  Submission[]
+  createdAt    DateTime     @default(now())
+}
+
+model Submission {
+  id             String           @id @default(cuid())
+  requisitionId  String
+  requisition    Requisition      @relation(fields: [requisitionId], references: [id])
+  candidateId    String
+  candidate      Candidate        @relation(fields: [candidateId], references: [id])
+  status         SubmissionStatus @default(SUBMITTED)
+  messages       Message[]
+  events         DecisionEvent[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([requisitionId])
+  @@index([candidateId])
+  @@index([status])
+}
+
+model Message {
+  id           String      @id @default(cuid())
+  submissionId String
+  submission   Submission  @relation(fields: [submissionId], references: [id])
+  fromRole     Role
+  body         String
+  createdAt    DateTime    @default(now())
+}
+
+model DecisionEvent {
+  id            String        @id @default(cuid())
+  submissionId  String
+  submission    Submission    @relation(fields: [submissionId], references: [id])
+  type          DecisionType
+  note          String?
+  declineReason DeclineReason?
+  createdAt     DateTime      @default(now())
+}

@@ -1,0 +1,27 @@
+{
+  "name": "cvrenova-portal",
+  "version": "0.1.0",
+  "private": true,
+
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
+  },
+
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.2",
+    "next": "14.x",
+    "react": "18.x",
+    "react-dom": "18.x"
+  },
+  "devDependencies": {
+    "prisma": "^6.19.2",
+    "ts-node": "^10.x",
+    "typescript": "^5.x"
+  }
+}
