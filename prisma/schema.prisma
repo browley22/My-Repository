@@ -23,6 +23,7 @@ enum SubmissionStatus {
 }
 
 enum DecisionType {
+  STATUS_CHANGE
   REQUEST_INTERVIEW
   MAKE_OFFER
   DECLINE
@@ -111,8 +112,13 @@ model DecisionEvent {
   id            String        @id @default(cuid())
   submissionId  String
   submission    Submission    @relation(fields: [submissionId], references: [id])
+
   type          DecisionType
   note          String?
   declineReason DeclineReason?
+
+  fromStatus    SubmissionStatus?
+  toStatus      SubmissionStatus?
+
   createdAt     DateTime      @default(now())
 }
