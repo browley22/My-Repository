@@ -100,6 +100,9 @@ export default function CandidateDetailSheet({
   const [lastDropFileType, setLastDropFileType] = React.useState<string | null>(null);
   const [candidateIdDebug, setCandidateIdDebug] = React.useState<string | null>(null);
   const [lastUploadStatus, setLastUploadStatus] = React.useState("");
+  const [dragOverCount, setDragOverCount] = React.useState(0);
+  const [dropCount, setDropCount] = React.useState(0);
+  const [lastEventTarget, setLastEventTarget] = React.useState("");
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
   const dropInFlightRef = React.useRef(false);
 
@@ -216,46 +219,58 @@ export default function CandidateDetailSheet({
 
   const isResumeTabActive = activeTab === "RESUME" && role === "AGENCY";
   React.useEffect(() => {
-    function handleGlobalDrop(e: DragEvent) {
-      if (!isResumeTabActive) return;
+    if (!isResumeTabActive || role !== "AGENCY") return;
+
+    const onDragOver = (e: DragEvent) => {
       e.preventDefault();
+      e.stopPropagation();
+      setDragOverCount((c) => c + 1);
+      const t = e.target as HTMLElement | null;
+      setLastEventTarget(t?.tagName ?? "unknown");
+    };
+
+    const onDrop = async (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDropCount((c) => c + 1);
+
       const dt = e.dataTransfer;
-      if (!dt) return;
-      let file: File | undefined = dt.files?.[0];
-      if (!file && dt.items) {
-        for (let i = 0; i < dt.items.length; i++) {
-          const item = dt.items[i];
+      if (!dt) {
+        setLastUploadStatus("Drop: no dataTransfer");
+        return;
+      }
+
+      let file: File | null = null;
+      if (dt.items && dt.items.length) {
+        for (const item of Array.from(dt.items)) {
           if (item.kind === "file") {
-            file = item.getAsFile() ?? undefined;
+            file = item.getAsFile();
             break;
           }
         }
       }
-      if (file) {
-        setDropEventCount((n) => n + 1);
-        setCandidateIdDebug(candidateId);
-        setLastDropFileName(file.name);
-        setLastDropFileType(file.type || "(empty)");
-        setLastDroppedName(file.name);
-        uploadResumeFile(file);
-        setLastUploadStatus("Dropped via global listener");
-      } else {
-        setDropEventCount((n) => n + 1);
-        setCandidateIdDebug(candidateId);
-        setLastUploadStatus("Global drop detected but no file");
+      if (!file && dt.files && dt.files.length) file = dt.files[0];
+
+      if (!file) {
+        setLastUploadStatus("Drop: no file extracted");
+        setLastDropFileName(null);
+        return;
       }
-    }
-    function handleGlobalDragOver(e: DragEvent) {
-      if (!isResumeTabActive) return;
-      e.preventDefault();
-    }
-    document.addEventListener("drop", handleGlobalDrop);
-    document.addEventListener("dragover", handleGlobalDragOver);
-    return () => {
-      document.removeEventListener("drop", handleGlobalDrop);
-      document.removeEventListener("dragover", handleGlobalDragOver);
+
+      setLastDropFileName(file.name);
+      setLastUploadStatus("Drop: uploading...");
+      await uploadResumeFile(file);
+      setLastUploadStatus("Drop: upload finished (check resumeUrl)");
     };
-  }, [isResumeTabActive, candidateId, uploadResumeFile]);
+
+    window.addEventListener("dragover", onDragOver, true);
+    window.addEventListener("drop", onDrop, true);
+
+    return () => {
+      window.removeEventListener("dragover", onDragOver, true);
+      window.removeEventListener("drop", onDrop, true);
+    };
+  }, [isResumeTabActive, role, candidateId, uploadResumeFile]);
 
   if (!submission) return null;
 
@@ -273,6 +288,34 @@ export default function CandidateDetailSheet({
   const top = Math.max(8, Math.min(anchorRect.top, vh - maxH - 8));
 
   return (
+    <>
+      {isResumeTabActive && (
+        <div
+          style={{
+            position: "fixed",
+            top: 8,
+            right: 8,
+            zIndex: 10001,
+            background: "#1e293b",
+            color: "#e2e8f0",
+            padding: "10px 14px",
+            borderRadius: 8,
+            fontFamily: "monospace",
+            fontSize: 12,
+            lineHeight: 1.5,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+            whiteSpace: "pre-wrap",
+            maxWidth: 320,
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>DnD ACTIVE</div>
+          <div>dragOver: {dragOverCount}</div>
+          <div>drop: {dropCount}</div>
+          <div>target: {lastEventTarget || "—"}</div>
+          <div>file: {lastDropFileName ?? "none"}</div>
+          <div>status: {lastUploadStatus || "—"}</div>
+        </div>
+      )}
     <div
       style={{
         position: "fixed",
@@ -702,5 +745,6 @@ export default function CandidateDetailSheet({
           </div>
         )}
     </div>
+    </>
   );
 }
