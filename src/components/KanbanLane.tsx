@@ -112,6 +112,7 @@ function DraggableCard({
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: submission.id,
+      disabled: role === "CLIENT",
     });
   const [nextActionOverride, setNextActionOverride] = React.useState<string | null>(null);
 

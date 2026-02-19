@@ -89,6 +89,20 @@ export default function RequisitionBoardClient({
   const router = useRouter();
   const [now, setNow] = useState(Date.now());
   const [mounted, setMounted] = useState(false);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+
+  const handleMove = React.useCallback(
+    async (submissionId: string, newStatus: string) => {
+      if (role !== "AGENCY") return;
+      setActionError(null);
+      try {
+        await onMove(submissionId, newStatus);
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Action not allowed");
+      }
+    },
+    [role, onMove]
+  );
 
   useEffect(() => {
     setMounted(true);
@@ -2093,11 +2107,16 @@ export default function RequisitionBoardClient({
         </div>
       )}
 
+      {actionError && (
+        <div style={{ padding: "8px 12px", marginBottom: 8, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, fontSize: 13, color: "#991b1b" }}>
+          {actionError}
+        </div>
+      )}
       {boardMode === "BOARD" ? (
         <KanbanLane
           columns={columns}
           submissions={filteredSubmissions as any}
-          onMove={onMove as any}
+          onMove={handleMove as any}
           onCardClick={handleCardClick as any}
           onBeforeJumpToStale={() => {
             setDetailOpen(false);
@@ -2229,7 +2248,7 @@ export default function RequisitionBoardClient({
                           type="button"
                           onClick={async () => {
                             const next = getNextStatus(r.status);
-                            if (next) { await onMove(r.id, next); router.refresh(); }
+                            if (next) { await handleMove(r.id, next); router.refresh(); }
                           }}
                           style={{ padding: "4px 10px", fontSize: 12, borderRadius: 6, border: "1px solid #cbd5e1", background: "#fff", cursor: "pointer" }}
                         >
