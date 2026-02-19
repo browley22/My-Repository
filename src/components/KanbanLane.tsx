@@ -46,6 +46,24 @@ type Props = {
   onToggleSelect?: (id: string) => void;
 };
 
+const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
+  { value: "—", label: "—", category: "internal" },
+  { value: "Follow up with client", label: "Follow up with client", category: "client" },
+  { value: "Reply or take action", label: "Reply or take action", category: "waiting" },
+  { value: "Schedule interview", label: "Schedule interview", category: "candidate" },
+  { value: "Prepare offer", label: "Prepare offer", category: "internal" },
+  { value: "Review update", label: "Review update", category: "client" },
+  { value: "Follow up needed", label: "Follow up needed", category: "waiting" },
+  { value: "Done", label: "Done", category: "done" },
+];
+const NEXT_ACTION_STYLES: Record<string, { bg: string; text: string }> = {
+  waiting: { bg: "#fef9c3", text: "#854d0e" },
+  client: { bg: "#bfdbfe", text: "#1e40af" },
+  candidate: { bg: "#e9d5ff", text: "#5b21b6" },
+  internal: { bg: "#e5e7eb", text: "#374151" },
+  done: { bg: "#bbf7d0", text: "#166534" },
+};
+
 function prettyStatus(s?: string | null) {
   if (!s) return "";
   return String(s)
@@ -95,6 +113,7 @@ function DraggableCard({
     useDraggable({
       id: submission.id,
     });
+  const [nextActionOverride, setNextActionOverride] = React.useState<string | null>(null);
 
   const fullName = `${submission.candidate.firstName} ${submission.candidate.lastName}`;
 
@@ -512,11 +531,55 @@ function DraggableCard({
               In this stage: {stageAgingText}
             </div>
           )}
-          {nextStepHint && (
-            <div style={{ fontSize: 10, color: "#3b82f6", marginTop: 3, fontWeight: 500 }}>
-              → {nextStepHint}
-            </div>
-          )}
+          {(() => {
+            const displayAction = nextActionOverride ?? nextStepHint ?? "—";
+            const option = NEXT_ACTION_OPTIONS.find((o) => o.value === displayAction);
+            const category = option?.category ?? "internal";
+            const style = NEXT_ACTION_STYLES[category] ?? NEXT_ACTION_STYLES.internal;
+            const updatedAgo = days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`;
+            return (
+              <div
+                style={{ marginTop: 6 }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 10px",
+                    borderRadius: 8,
+                    background: style.bg,
+                    color: style.text,
+                    border: "1px solid rgba(0,0,0,0.06)",
+                  }}
+                >
+                  <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginBottom: 2 }}>Next Action</div>
+                  <select
+                    value={displayAction}
+                    onChange={(e) => setNextActionOverride(e.target.value)}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      padding: "2px 4px",
+                      margin: 0,
+                      borderRadius: 4,
+                      border: "none",
+                      background: "transparent",
+                      color: "inherit",
+                      cursor: "pointer",
+                      outline: "none",
+                      width: "100%",
+                      minWidth: 140,
+                    }}
+                  >
+                    {NEXT_ACTION_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                  <div style={{ fontSize: 9, opacity: 0.85, marginTop: 2 }}>updated {updatedAgo}</div>
+                </div>
+              </div>
+            );
+          })()}
           {latestDecision && (
             <div
               style={{
