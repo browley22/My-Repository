@@ -104,10 +104,15 @@ export default function CandidateDetailSheet({
   const [dragOverCount, setDragOverCount] = React.useState(0);
   const [dropCount, setDropCount] = React.useState(0);
   const [lastEventTarget, setLastEventTarget] = React.useState("");
+  const [localResumeUrl, setLocalResumeUrl] = React.useState<string | null>(null);
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
   const dropInFlightRef = React.useRef(false);
 
   const effectiveCandidateId = submission?.candidate?.id ?? candidateId ?? null;
+  const initialResumeUrl = submission?.candidate?.resumeUrl ?? null;
+  const effectiveResumeUrl = localResumeUrl ?? initialResumeUrl;
+
+  React.useEffect(() => setLocalResumeUrl(null), [effectiveCandidateId]);
 
   const RESUME_ALLOWED_TYPES = [
     "application/pdf",
@@ -147,7 +152,13 @@ export default function CandidateDetailSheet({
           setLastUploadStatus("Upload failed: " + errMsg);
           return;
         }
-        setLastUploadStatus("Upload success");
+        const resumeUrl = typeof data?.resumeUrl === "string" ? data.resumeUrl : null;
+        if (resumeUrl) {
+          setLocalResumeUrl(resumeUrl);
+          setLastUploadStatus("Upload success");
+        } else {
+          setLastUploadStatus("Upload failed: no resumeUrl in response");
+        }
         router.refresh();
       } catch (err) {
         setResumeError("Upload failed");
@@ -272,7 +283,6 @@ export default function CandidateDetailSheet({
       setLastDropFileName(file.name);
       setLastUploadStatus("Drop: uploading...");
       await uploadResumeFile(file);
-      setLastUploadStatus("Drop: upload finished (check resumeUrl)");
     };
 
     window.addEventListener("dragover", onDragOver, true);
@@ -639,8 +649,8 @@ export default function CandidateDetailSheet({
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Resume</h3>
             <div className="mt-2">
-              {c?.resumeUrl ? (
-                <a className="text-sm underline" href={c.resumeUrl} target="_blank" rel="noreferrer">
+              {effectiveResumeUrl ? (
+                <a className="text-sm underline" href={effectiveResumeUrl} target="_blank" rel="noreferrer">
                   Open resume
                 </a>
               ) : (
@@ -702,11 +712,11 @@ export default function CandidateDetailSheet({
                       onClick={() => resumeInputRef.current?.click()}
                       className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
                     >
-                      {resumeUploading ? "Uploading…" : c?.resumeUrl ? "Replace resume" : "Upload resume"}
+                      {resumeUploading ? "Uploading…" : effectiveResumeUrl ? "Replace resume" : "Upload resume"}
                     </button>
-                    {c?.resumeUrl && (
+                    {effectiveResumeUrl && (
                       <a
-                        href={c.resumeUrl}
+                        href={effectiveResumeUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
@@ -727,10 +737,10 @@ export default function CandidateDetailSheet({
                 </div>
               </>
             )}
-            {role !== "AGENCY" && c?.resumeUrl && (
+            {role !== "AGENCY" && effectiveResumeUrl && (
               <div className="flex flex-wrap items-center gap-2">
                 <a
-                  href={c.resumeUrl}
+                  href={effectiveResumeUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
@@ -742,11 +752,11 @@ export default function CandidateDetailSheet({
             {role === "AGENCY" && resumeError && (
               <p className="text-sm text-red-600">{resumeError}</p>
             )}
-            {c?.resumeUrl ? (
-              c.resumeUrl.toLowerCase().endsWith(".pdf") ? (
+            {effectiveResumeUrl ? (
+              effectiveResumeUrl.toLowerCase().endsWith(".pdf") ? (
                 <div className="mt-2 flex-1 min-h-[200px] border rounded overflow-hidden bg-gray-50">
                   <iframe
-                    src={c.resumeUrl}
+                    src={effectiveResumeUrl}
                     title="Resume preview"
                     className="w-full h-full min-h-[300px] border-0"
                   />
