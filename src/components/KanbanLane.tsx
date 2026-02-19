@@ -340,6 +340,8 @@ function DraggableCard({
   }, [isStale, submission.status, hasRecentClientActivity, role]);
 
   const style: React.CSSProperties = {
+    position: "relative",
+    overflow: "visible",
     transform: CSS.Translate.toString(transform),
     transition: "box-shadow 120ms ease, transform 120ms ease",
     background: isStale ? "#fef2f2" : isAtRisk || isWatch ? "#fffbeb" : "#f0fdf4",
@@ -349,7 +351,6 @@ function DraggableCard({
     border: agingBorder,
     boxShadow: isDragging ? "0 8px 20px rgba(0,0,0,0.08)" : "none",
     opacity: isDragging ? 0.85 : 1,
-    position: "relative",
   };
 
   return (
@@ -375,7 +376,7 @@ function DraggableCard({
         <div
           onClick={(e) => { e.stopPropagation(); onToggleSelect(submission.id); }}
           onPointerDown={(e) => e.stopPropagation()}
-          style={{ position: "absolute", top: 6, right: 6, zIndex: 1 }}
+          style={{ position: "absolute", top: 6, right: 6, zIndex: 2 }}
         >
           <input
             type="checkbox"
@@ -391,6 +392,7 @@ function DraggableCard({
             position: "absolute",
             top: 26,
             right: 6,
+            zIndex: 2,
             background: "#f59e0b",
             color: "#fff",
             fontSize: 9,
@@ -404,28 +406,30 @@ function DraggableCard({
         </div>
       )}
       {isStale && (
-  <div
-    style={{
-      position: "absolute",
-      top: 26,
-      right: 6,
-      background: "#ef4444",
-      color: "#fff",
-      fontSize: 10,
-      padding: "2px 6px",
-      borderRadius: 999,
-      fontWeight: 600,
-    }}
-  >
-    {role === "CLIENT" ? "Needs follow-up" : "Needs Attention"}
-  </div>
-)}
+        <div
+          style={{
+            position: "absolute",
+            top: 26,
+            right: 6,
+            zIndex: 2,
+            background: "#ef4444",
+            color: "#fff",
+            fontSize: 10,
+            padding: "2px 6px",
+            borderRadius: 999,
+            fontWeight: 600,
+          }}
+        >
+          {role === "CLIENT" ? "Needs follow-up" : "Needs Attention"}
+        </div>
+      )}
       {role !== "CLIENT" && !hasOwner && (
         <div
           style={{
             position: "absolute",
             bottom: 6,
             left: 6,
+            zIndex: 2,
             background: "#6b7280",
             color: "#fff",
             fontSize: 9,
