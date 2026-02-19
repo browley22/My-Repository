@@ -198,7 +198,7 @@ export default function CandidateDetailSheet({
         file = e.dataTransfer.files[0];
       }
       if (!file) {
-        setResumeError("No file detected on drop");
+        setResumeError("No file detected. Drag-and-drop works from File Explorer. If you're dragging from email, download the attachment first (or use Choose File).");
         setLastDroppedName(null);
         setLastUploadStatus("No file detected");
         return;
