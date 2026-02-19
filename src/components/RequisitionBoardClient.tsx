@@ -2299,6 +2299,7 @@ export default function RequisitionBoardClient({
             }}
             anchorRect={anchorRect}
             submission={selectedSubmission as any}
+            candidateId={selectedSubmission?.candidate?.id ?? ""}
             role={role}
             onRequestInterview={onRequestInterview as any}
             onDecline={onDecline as any}

@@ -56,6 +56,7 @@ export default function CandidateDetailSheet({
   onOpenChange,
   anchorRect,
   submission,
+  candidateId,
   role,
   onRequestInterview,
   onDecline,
@@ -72,6 +73,7 @@ export default function CandidateDetailSheet({
   onOpenChange: (open: boolean) => void;
   anchorRect: { left: number; right: number; top: number; bottom: number } | null;
   submission: SubmissionLike | null;
+  candidateId: string;
   role: "CLIENT" | "AGENCY";
   onRequestInterview: (submissionId: string) => void | Promise<void>;
   onDecline: (submissionId: string) => void | Promise<void>;
@@ -92,7 +94,9 @@ export default function CandidateDetailSheet({
   const [resumeUploading, setResumeUploading] = React.useState(false);
   const [resumeError, setResumeError] = React.useState<string | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
+  const [lastDroppedName, setLastDroppedName] = React.useState<string | null>(null);
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
+  const dropInFlightRef = React.useRef(false);
 
   const RESUME_ALLOWED_TYPES = [
     "application/pdf",
@@ -101,8 +105,12 @@ export default function CandidateDetailSheet({
   ];
   const uploadResumeFile = React.useCallback(
     async (file: File) => {
-      const candidateId = submission?.candidate?.id;
-      if (!candidateId) return;
+      if (!candidateId) {
+        setResumeError("Missing candidateId");
+        return;
+      }
+      const url = `/api/candidates/${candidateId}/resume`;
+      console.log("Resume upload URL:", url);
       const valid =
         RESUME_ALLOWED_TYPES.includes(file.type) ||
         /\.(pdf|doc|docx)$/i.test(file.name);
@@ -115,7 +123,7 @@ export default function CandidateDetailSheet({
       const form = new FormData();
       form.append("file", file);
       try {
-        const res = await fetch(`/api/candidates/${candidateId}/resume`, {
+        const res = await fetch(url, {
           method: "POST",
           body: form,
         });
@@ -132,7 +140,7 @@ export default function CandidateDetailSheet({
         setResumeUploading(false);
       }
     },
-    [submission?.candidate?.id, router]
+    [candidateId, router]
   );
 
   function handleResumeDragOver(e: React.DragEvent) {
@@ -150,11 +158,39 @@ export default function CandidateDetailSheet({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    console.log("DROP FIRED", {
+      candidateId,
+      hasFiles: e.dataTransfer.files?.length,
+      hasItems: e.dataTransfer.items?.length,
+    });
     if (resumeUploading) return;
-    const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    console.log("Dropped file:", { name: file.name, type: file.type, size: file.size });
-    await uploadResumeFile(file);
+    if (dropInFlightRef.current) return;
+    dropInFlightRef.current = true;
+    try {
+      let file: File | null = null;
+      if (e.dataTransfer.items?.length) {
+        for (let i = 0; i < e.dataTransfer.items.length; i++) {
+          const item = e.dataTransfer.items[i];
+          if (item.kind === "file") {
+            file = item.getAsFile();
+            break;
+          }
+        }
+      }
+      if (!file && e.dataTransfer.files?.length) {
+        file = e.dataTransfer.files[0];
+      }
+      if (!file) {
+        setResumeError("No file detected on drop");
+        setLastDroppedName(null);
+        return;
+      }
+      console.log("Dropped file:", { name: file.name, type: file.type, size: file.size });
+      setLastDroppedName(file.name);
+      await uploadResumeFile(file);
+    } finally {
+      dropInFlightRef.current = false;
+    }
   }
 
   // reset note and owner input when opening a different submission
@@ -529,6 +565,7 @@ export default function CandidateDetailSheet({
                   onDragOver={handleResumeDragOver}
                   onDragLeave={handleResumeDragLeave}
                   onDrop={handleResumeDrop}
+                  onDropCapture={handleResumeDrop}
                   style={{
                     border: isDragging ? "2px dashed #60a5fa" : "1px dashed #e5e7eb",
                     background: isDragging ? "#eff6ff" : "#fff",
@@ -560,6 +597,9 @@ export default function CandidateDetailSheet({
                   </div>
                   <p className="mt-2 text-sm text-gray-500">or drop PDF, DOC, or DOCX here</p>
                 </div>
+                <p className="text-xs text-gray-400" style={{ fontFamily: "monospace" }}>
+                  dragging: {String(isDragging)} · last drop: {lastDroppedName ?? "none"} · candidateId: {candidateId || "—"}
+                </p>
               </>
             )}
             {role !== "AGENCY" && c?.resumeUrl && (
