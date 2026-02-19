@@ -78,6 +78,7 @@ model Candidate {
   yearsExp     Int?
   rate         String?
   availability String?
+  resumeUrl    String?       // optional
   submissions  Submission[]
   createdAt    DateTime     @default(now())
 }

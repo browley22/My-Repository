@@ -103,15 +103,27 @@ export async function POST(
 
   const resumeUrl = `/uploads/resumes/${safeName}`;
 
+  const existing = await prisma.candidate.findUnique({
+    where: { id: candidateId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json(
+      { error: "Candidate not found for id", candidateId },
+      { status: 404 }
+    );
+  }
+
   try {
     await prisma.candidate.update({
       where: { id: candidateId },
       data: { resumeUrl },
     });
-  } catch (err) {
-    console.error("Resume update candidate:", err);
+  } catch (err: unknown) {
+    const message = err && typeof err === "object" && "message" in err ? String((err as { message?: unknown }).message) : String(err);
+    console.error("Candidate update failed", err);
     return NextResponse.json(
-      { error: "Failed to update candidate" },
+      { error: "Candidate update failed", candidateId, detail: message },
       { status: 500 }
     );
   }

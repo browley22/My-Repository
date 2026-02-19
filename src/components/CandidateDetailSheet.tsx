@@ -148,8 +148,9 @@ export default function CandidateDetailSheet({
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           const errMsg = typeof data?.error === "string" ? data.error : "Upload failed";
-          setResumeError(errMsg);
-          setLastUploadStatus("Upload failed: " + errMsg);
+          const withDetail = typeof data?.detail === "string" ? `${errMsg} — ${data.detail}` : errMsg;
+          setResumeError(withDetail);
+          setLastUploadStatus("Upload failed: " + withDetail);
           return;
         }
         const resumeUrl = typeof data?.resumeUrl === "string" ? data.resumeUrl : null;
@@ -758,7 +759,8 @@ export default function CandidateDetailSheet({
                 </div>
                 <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500" style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
                   {"--------------------------------\nDROP DEBUG\nevents: "}{dropEventCount}
-                  {"\ncandidateId: "}{effectiveCandidateId ?? candidateIdDebug ?? "—"}
+                  {"\ncandidateIdUsedForUpload: "}{effectiveCandidateId ?? "—"}
+                  {"\nsubmissionId: "}{submission?.id ?? "—"}
                   {"\nfile: "}{lastDropFileName ?? "—"}
                   {"\ntype: "}{lastDropFileType ?? "—"}
                   {"\nstatus: "}{lastUploadStatus || "—"}
