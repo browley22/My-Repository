@@ -578,7 +578,9 @@ export default function CandidateDetailSheet({
                 <div
                   tabIndex={0}
                   onDragEnter={handleResumeDragOver}
+                  onDragEnterCapture={handleResumeDragOver}
                   onDragOver={handleResumeDragOver}
+                  onDragOverCapture={handleResumeDragOver}
                   onDragLeave={handleResumeDragLeave}
                   onDrop={handleResumeDrop}
                   onDropCapture={handleResumeDrop}
@@ -589,6 +591,7 @@ export default function CandidateDetailSheet({
                     padding: 12,
                     minHeight: 90,
                     boxSizing: "border-box",
+                    pointerEvents: "auto",
                   }}
                 >
                   <div className="flex flex-wrap items-center gap-2">
