@@ -107,6 +107,8 @@ export default function CandidateDetailSheet({
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
   const dropInFlightRef = React.useRef(false);
 
+  const effectiveCandidateId = submission?.candidate?.id ?? candidateId ?? null;
+
   const RESUME_ALLOWED_TYPES = [
     "application/pdf",
     "application/msword",
@@ -114,12 +116,12 @@ export default function CandidateDetailSheet({
   ];
   const uploadResumeFile = React.useCallback(
     async (file: File) => {
-      if (!candidateId) {
-        setResumeError("Missing candidateId");
+      if (!effectiveCandidateId) {
+        setResumeError("Missing candidate id — cannot upload resume.");
         setLastUploadStatus("Missing candidateId");
         return;
       }
-      const url = `/api/candidates/${candidateId}/resume`;
+      const url = `/api/candidates/${effectiveCandidateId}/resume`;
       console.log("Resume upload URL:", url);
       const valid =
         RESUME_ALLOWED_TYPES.includes(file.type) ||
@@ -155,7 +157,7 @@ export default function CandidateDetailSheet({
         setResumeUploading(false);
       }
     },
-    [candidateId, router]
+    [effectiveCandidateId, router]
   );
 
   function handleResumeDragOver(e: React.DragEvent) {
@@ -234,6 +236,8 @@ export default function CandidateDetailSheet({
       e.preventDefault();
       e.stopPropagation();
       setDropCount((c) => c + 1);
+      setDropEventCount((n) => n + 1);
+      setCandidateIdDebug(effectiveCandidateId);
 
       const dt = e.dataTransfer;
       if (!dt) {
@@ -259,6 +263,12 @@ export default function CandidateDetailSheet({
         return;
       }
 
+      if (!effectiveCandidateId) {
+        setLastUploadStatus("Missing candidate id");
+        setResumeError("Missing candidate id — cannot upload resume.");
+        return;
+      }
+
       setLastDropFileName(file.name);
       setLastUploadStatus("Drop: uploading...");
       await uploadResumeFile(file);
@@ -272,7 +282,7 @@ export default function CandidateDetailSheet({
       window.removeEventListener("dragover", onDragOver, true);
       window.removeEventListener("drop", onDrop, true);
     };
-  }, [isResumeTabActive, role, candidateId, uploadResumeFile]);
+  }, [isResumeTabActive, role, effectiveCandidateId, uploadResumeFile]);
 
   if (!submission) return null;
 
@@ -652,6 +662,9 @@ export default function CandidateDetailSheet({
             </button>
             {role === "AGENCY" && (
               <>
+                {effectiveCandidateId == null && (
+                  <p className="text-sm text-red-600">Missing candidate id — cannot upload resume.</p>
+                )}
                 <input
                   type="file"
                   ref={resumeInputRef}
@@ -685,7 +698,7 @@ export default function CandidateDetailSheet({
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      disabled={resumeUploading}
+                      disabled={resumeUploading || !effectiveCandidateId}
                       onClick={() => resumeInputRef.current?.click()}
                       className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
                     >
@@ -706,7 +719,7 @@ export default function CandidateDetailSheet({
                 </div>
                 <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500" style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
                   {"--------------------------------\nDROP DEBUG\nevents: "}{dropEventCount}
-                  {"\ncandidateId: "}{candidateIdDebug ?? "—"}
+                  {"\ncandidateId: "}{effectiveCandidateId ?? candidateIdDebug ?? "—"}
                   {"\nfile: "}{lastDropFileName ?? "—"}
                   {"\ntype: "}{lastDropFileType ?? "—"}
                   {"\nstatus: "}{lastUploadStatus || "—"}
