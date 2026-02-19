@@ -95,6 +95,11 @@ export default function CandidateDetailSheet({
   const [resumeError, setResumeError] = React.useState<string | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
   const [lastDroppedName, setLastDroppedName] = React.useState<string | null>(null);
+  const [dropEventCount, setDropEventCount] = React.useState(0);
+  const [lastDropFileName, setLastDropFileName] = React.useState<string | null>(null);
+  const [lastDropFileType, setLastDropFileType] = React.useState<string | null>(null);
+  const [candidateIdDebug, setCandidateIdDebug] = React.useState<string | null>(null);
+  const [lastUploadStatus, setLastUploadStatus] = React.useState("");
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
   const dropInFlightRef = React.useRef(false);
 
@@ -107,6 +112,7 @@ export default function CandidateDetailSheet({
     async (file: File) => {
       if (!candidateId) {
         setResumeError("Missing candidateId");
+        setLastUploadStatus("Missing candidateId");
         return;
       }
       const url = `/api/candidates/${candidateId}/resume`;
@@ -120,6 +126,7 @@ export default function CandidateDetailSheet({
       }
       setResumeError(null);
       setResumeUploading(true);
+      setLastUploadStatus("Uploading...");
       const form = new FormData();
       form.append("file", file);
       try {
@@ -129,12 +136,16 @@ export default function CandidateDetailSheet({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setResumeError(typeof data?.error === "string" ? data.error : "Upload failed");
+          const errMsg = typeof data?.error === "string" ? data.error : "Upload failed";
+          setResumeError(errMsg);
+          setLastUploadStatus("Upload failed: " + errMsg);
           return;
         }
+        setLastUploadStatus("Upload success");
         router.refresh();
       } catch (err) {
         setResumeError("Upload failed");
+        setLastUploadStatus("Upload failed: " + (err instanceof Error ? err.message : "Upload failed"));
         console.error("Resume upload error:", err);
       } finally {
         setResumeUploading(false);
@@ -158,6 +169,8 @@ export default function CandidateDetailSheet({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    setDropEventCount((n) => n + 1);
+    setCandidateIdDebug(candidateId);
     console.log("DROP FIRED", {
       candidateId,
       hasFiles: e.dataTransfer.files?.length,
@@ -183,8 +196,11 @@ export default function CandidateDetailSheet({
       if (!file) {
         setResumeError("No file detected on drop");
         setLastDroppedName(null);
+        setLastUploadStatus("No file detected");
         return;
       }
+      setLastDropFileName(file.name);
+      setLastDropFileType(file.type || "(empty)");
       console.log("Dropped file:", { name: file.name, type: file.type, size: file.size });
       setLastDroppedName(file.name);
       await uploadResumeFile(file);
@@ -597,9 +613,14 @@ export default function CandidateDetailSheet({
                   </div>
                   <p className="mt-2 text-sm text-gray-500">or drop PDF, DOC, or DOCX here</p>
                 </div>
-                <p className="text-xs text-gray-400" style={{ fontFamily: "monospace" }}>
-                  dragging: {String(isDragging)} · last drop: {lastDroppedName ?? "none"} · candidateId: {candidateId || "—"}
-                </p>
+                <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500" style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                  {"--------------------------------\nDROP DEBUG\nevents: "}{dropEventCount}
+                  {"\ncandidateId: "}{candidateIdDebug ?? "—"}
+                  {"\nfile: "}{lastDropFileName ?? "—"}
+                  {"\ntype: "}{lastDropFileType ?? "—"}
+                  {"\nstatus: "}{lastUploadStatus || "—"}
+                  {"\n--------------------------------"}
+                </div>
               </>
             )}
             {role !== "AGENCY" && c?.resumeUrl && (
