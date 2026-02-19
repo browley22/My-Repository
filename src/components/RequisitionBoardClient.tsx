@@ -2243,7 +2243,7 @@ export default function RequisitionBoardClient({
                       >
                         Quick note
                       </button>
-                      {getNextStatus(r.status) && (
+                      {getNextStatus(r.status) && role === "AGENCY" && (
                         <button
                           type="button"
                           onClick={async () => {
