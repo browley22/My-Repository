@@ -741,7 +741,7 @@ export default function CandidateDetailSheet({
                           } catch {
                             parsed = null;
                           }
-                          const msg = parsed?.error ?? text || res.statusText || String(res.status);
+                          const msg = parsed?.error ?? (text || res.statusText || String(res.status));
                           setLastUploadStatus(`Test: ${res.status} — ${msg}`);
                         } catch (e) {
                           setLastUploadStatus(`Test: failed — ${e instanceof Error ? e.message : "Failed to fetch"}`);
