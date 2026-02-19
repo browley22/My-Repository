@@ -254,6 +254,7 @@ export default function CandidateDetailSheet({
       if (!file) {
         setLastUploadStatus("Drop: no file extracted");
         setLastDropFileName(null);
+        setResumeError("No file detected. Drag-and-drop works from File Explorer. If you're dragging from email or the browser, download the file first (or use Choose File).");
         return;
       }
 
