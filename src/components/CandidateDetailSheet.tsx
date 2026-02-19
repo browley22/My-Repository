@@ -391,10 +391,6 @@ export default function CandidateDetailSheet({
               </div>
             )}
           </div>
-
-          <button className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50" onClick={() => onOpenChange(false)}>
-            ✕
-          </button>
         </div>
 
         {/* Tabs - Resume only; Write-up is under Summary */}
@@ -528,8 +524,8 @@ export default function CandidateDetailSheet({
             <div className="mt-4">
               <div className="text-sm font-semibold text-gray-700">Feedback</div>
               <textarea
-                className="mt-2 w-full rounded-md border p-2 text-sm"
-                rows={4}
+                className="mt-2 w-full rounded-md border border-gray-300 p-3 text-sm box-border"
+                style={{ width: "100%", minHeight: 140 }}
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="Add a note for the agency/recruiter (e.g., 'Strong fit—please schedule interview')"
