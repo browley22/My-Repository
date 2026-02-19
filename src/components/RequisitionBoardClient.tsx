@@ -170,6 +170,7 @@ export default function RequisitionBoardClient({
     if (selectedSubmission?.id === submission.id) {
       setDetailOpen(false);
       setAnchorRect(null);
+      setSelectedSubmission(null);
       return;
     }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -2295,7 +2296,10 @@ export default function RequisitionBoardClient({
             open={detailOpen}
             onOpenChange={(open) => {
               setDetailOpen(open);
-              if (!open) setAnchorRect(null);
+              if (!open) {
+                setAnchorRect(null);
+                setSelectedSubmission(null);
+              }
             }}
             anchorRect={anchorRect}
             submission={selectedSubmission as any}
