@@ -161,8 +161,9 @@ export default function CandidateDetailSheet({
         }
         router.refresh();
       } catch (err) {
-        setResumeError("Upload failed");
-        setLastUploadStatus("Upload failed: " + (err instanceof Error ? err.message : "Upload failed"));
+        const msg = err instanceof Error ? err.message : "Failed to fetch";
+        setResumeError(`Upload failed (${msg}): ${url}`);
+        setLastUploadStatus("Upload failed: " + msg);
         console.error("Resume upload error:", err);
       } finally {
         setResumeUploading(false);

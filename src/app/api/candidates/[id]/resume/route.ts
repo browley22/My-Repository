@@ -14,6 +14,8 @@ const ALLOWED_TYPES = [
 ];
 const MAX_BYTES = 10 * 1024 * 1024; // 10MB
 
+export const runtime = "nodejs";
+
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
