@@ -126,7 +126,7 @@ export default function CandidateDetailSheet({
         setLastUploadStatus("Missing candidateId");
         return;
       }
-      const url = `/api/candidates/${effectiveCandidateId}/resume`;
+      const url = `${window.location.origin}/api/candidates/${effectiveCandidateId}/resume`;
       console.log("Resume upload URL:", url);
       const valid =
         RESUME_ALLOWED_TYPES.includes(file.type) ||
@@ -724,6 +724,33 @@ export default function CandidateDetailSheet({
                         Download
                       </a>
                     )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!effectiveCandidateId) {
+                          setLastUploadStatus("Test: no candidate id");
+                          return;
+                        }
+                        const url = `${window.location.origin}/api/candidates/${effectiveCandidateId}/resume`;
+                        try {
+                          const res = await fetch(url, { method: "POST", body: new FormData() });
+                          const text = await res.text();
+                          let parsed: { error?: string } | null = null;
+                          try {
+                            parsed = JSON.parse(text);
+                          } catch {
+                            parsed = null;
+                          }
+                          const msg = parsed?.error ?? text || res.statusText || String(res.status);
+                          setLastUploadStatus(`Test: ${res.status} — ${msg}`);
+                        } catch (e) {
+                          setLastUploadStatus(`Test: failed — ${e instanceof Error ? e.message : "Failed to fetch"}`);
+                        }
+                      }}
+                      className="rounded-md border border-amber-300 px-3 py-1 text-sm hover:bg-amber-50"
+                    >
+                      Test resume upload endpoint
+                    </button>
                   </div>
                   <p className="mt-2 text-sm text-gray-500">or drop PDF, DOC, or DOCX here</p>
                 </div>
