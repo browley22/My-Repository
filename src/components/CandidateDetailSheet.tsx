@@ -121,12 +121,13 @@ export default function CandidateDetailSheet({
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setResumeError(data.error || "Upload failed");
+          setResumeError(typeof data?.error === "string" ? data.error : "Upload failed");
           return;
         }
         router.refresh();
-      } catch {
+      } catch (err) {
         setResumeError("Upload failed");
+        console.error("Resume upload error:", err);
       } finally {
         setResumeUploading(false);
       }
@@ -137,6 +138,7 @@ export default function CandidateDetailSheet({
   function handleResumeDragOver(e: React.DragEvent) {
     e.preventDefault();
     e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
     if (!resumeUploading) setIsDragging(true);
   }
   function handleResumeDragLeave(e: React.DragEvent) {
@@ -151,6 +153,7 @@ export default function CandidateDetailSheet({
     if (resumeUploading) return;
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
+    console.log("Dropped file:", { name: file.name, type: file.type, size: file.size });
     await uploadResumeFile(file);
   }
 
@@ -527,10 +530,12 @@ export default function CandidateDetailSheet({
                   onDragLeave={handleResumeDragLeave}
                   onDrop={handleResumeDrop}
                   style={{
-                    border: isDragging ? "2px dashed #60a5fa" : "1px solid #e5e7eb",
+                    border: isDragging ? "2px dashed #60a5fa" : "1px dashed #e5e7eb",
                     background: isDragging ? "#eff6ff" : "#fff",
                     borderRadius: 10,
                     padding: 12,
+                    minHeight: 90,
+                    boxSizing: "border-box",
                   }}
                 >
                   <div className="flex flex-wrap items-center gap-2">

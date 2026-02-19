@@ -54,7 +54,11 @@ export async function POST(
 
   const blob = file as Blob;
   const type = blob.type;
-  if (!ALLOWED_TYPES.includes(type)) {
+  const originalName = (file as File).name || "resume";
+  const ext = path.extname(originalName).toLowerCase();
+  const allowedByMime = ALLOWED_TYPES.includes(type);
+  const allowedByExt = [".pdf", ".doc", ".docx"].includes(ext);
+  if (!allowedByMime && !allowedByExt) {
     return NextResponse.json(
       { error: "Invalid file type. Allowed: PDF, DOC, DOCX" },
       { status: 400 }
@@ -68,9 +72,8 @@ export async function POST(
     );
   }
 
-  const originalName = (file as File).name || "resume";
-  const ext = path.extname(originalName) || (type === "application/pdf" ? ".pdf" : ".doc");
-  const safeName = `${candidateId}-${Date.now()}${ext}`;
+  const saveExt = [".pdf", ".doc", ".docx"].includes(ext) ? ext : (type === "application/pdf" ? ".pdf" : ".doc");
+  const safeName = `${candidateId}-${Date.now()}${saveExt}`;
   const dir = path.join(process.cwd(), "public", "uploads", "resumes");
 
   try {
