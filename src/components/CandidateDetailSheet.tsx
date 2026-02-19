@@ -157,7 +157,8 @@ export default function CandidateDetailSheet({
           setLocalResumeUrl(resumeUrl);
           setLastUploadStatus("Upload success");
         } else {
-          setLastUploadStatus("Upload failed: no resumeUrl in response");
+          setResumeError("Upload succeeded but server did not return resumeUrl");
+          setLastUploadStatus("Upload succeeded but server did not return resumeUrl; keys: " + Object.keys(data || {}).join(", "));
         }
         router.refresh();
       } catch (err) {

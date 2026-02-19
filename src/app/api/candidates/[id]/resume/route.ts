@@ -116,5 +116,5 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ resumeUrl });
+  return NextResponse.json({ resumeUrl }, { status: 200 });
 }
