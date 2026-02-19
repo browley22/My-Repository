@@ -2,6 +2,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { assertCanAccessSubmission, assertCanAccessRequisition } from "@/lib/submission-auth";
+import { createEventPayload } from "@/lib/create-event";
+import { ensureSubmissionOwnerIfNone } from "@/lib/submission-owner";
 
 const prisma = new PrismaClient();
 
@@ -28,6 +31,12 @@ export default async function SubmissionPage({
 
   if (!submission) return <div>Submission not found.</div>;
 
+  try {
+    assertCanAccessRequisition(session, submission.requisition.clientId);
+  } catch {
+    return <div>Access denied.</div>;
+  }
+
   return (
     <div style={{ padding: 40 }}>
       <h1>
@@ -45,15 +54,19 @@ export default async function SubmissionPage({
  
   action={async () => {
     "use server";
+    const session = await getServerSession(authOptions);
+    await assertCanAccessSubmission(session, id, { allowedRoles: ["CLIENT"] });
 
     await prisma.submission.update({
       where: { id },
       data: {
         status: "INTERVIEW_REQUESTED",
         events: {
-          create: {
+          create: createEventPayload({
             type: "REQUEST_INTERVIEW",
-          },
+            note: "Client requested interview",
+            actorRole: "CLIENT",
+          }),
         },
       },
     });
@@ -79,16 +92,19 @@ export default async function SubmissionPage({
 <form
   action={async () => {
     "use server";
+    const session = await getServerSession(authOptions);
+    await assertCanAccessSubmission(session, id, { allowedRoles: ["CLIENT"] });
 
     await prisma.submission.update({
       where: { id },
       data: {
         status: "OFFER_PENDING",
         events: {
-          create: {
+          create: createEventPayload({
             type: "MAKE_OFFER",
             note: "Offer requested by client",
-          },
+            actorRole: "CLIENT",
+          }),
         },
       },
     });
@@ -113,20 +129,27 @@ export default async function SubmissionPage({
 <form
   action={async (formData) => {
     "use server";
+    const session = await getServerSession(authOptions);
+    await assertCanAccessSubmission(session, id, { allowedRoles: ["CLIENT"] });
 
     const reason = String(formData.get("reason") || "OTHER");
     const note = String(formData.get("note") || "").trim();
+    const current = await prisma.submission.findUnique({ where: { id }, select: { status: true } });
+    const fromStatus = current?.status;
 
     await prisma.submission.update({
       where: { id },
       data: {
         status: "DECLINED",
         events: {
-          create: {
+          create: createEventPayload({
             type: "DECLINE",
-            declineReason: reason as any,
+            fromStatus,
+            toStatus: "DECLINED",
             note: note || "Declined by client",
-          },
+            actorRole: "CLIENT",
+            declineReason: reason,
+          }),
         },
       },
     });
@@ -205,6 +228,53 @@ export default async function SubmissionPage({
           ))}
         </ul>
       )}
+
+      <form
+        action={async (formData) => {
+          "use server";
+          const session = await getServerSession(authOptions);
+          const body = String(formData.get("body") || "").trim();
+          if (!body) return;
+
+          const { role } = await assertCanAccessSubmission(session, id);
+
+          await prisma.message.create({
+            data: {
+              submissionId: id,
+              fromRole: role as any,
+              body,
+            },
+          });
+
+          await ensureSubmissionOwnerIfNone(id, session);
+          revalidatePath(`/submissions/${id}`);
+        }}
+        style={{ marginTop: 16 }}
+      >
+        <label style={{ display: "block", marginBottom: 6 }}>
+          Add message
+        </label>
+        <textarea
+          name="body"
+          placeholder="Ask a question or leave a note for your counterpart..."
+          rows={3}
+          style={{ width: 360, padding: 8, fontFamily: "inherit", fontSize: 14 }}
+        />
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="submit"
+            style={{
+              padding: "8px 16px",
+              background: "#4b5563",
+              color: "white",
+              border: "none",
+              cursor: "pointer",
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </form>
 
       <br />
       <a href={`/requisitions/${submission.requisitionId}`}>Back to Requisition</a>

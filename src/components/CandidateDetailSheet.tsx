@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
+import { getSubmissionOwnerName } from "@/lib/submission-owner";
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -38,29 +40,123 @@ type SubmissionLike = {
   status: string;
   candidate?: CandidateLike | null;
   events?: any[];
+  messages?: {
+    id: string;
+    fromRole: "CLIENT" | "AGENCY";
+    body: string;
+    createdAt?: string;
+  }[];
 };
+
+const POPOVER_WIDTH = 420;
+const GAP = 12;
 
 export default function CandidateDetailSheet({
   open,
   onOpenChange,
+  anchorRect,
   submission,
+  role,
   onRequestInterview,
   onDecline,
   onAddFeedback,
+  onMarkInterested,
+  onMarkPass,
+  onNeedInfo,
+  onMakeOffer,
+  onOfferAccepted,
+  onOfferDeclined,
+  onSetOwner,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  anchorRect: { left: number; right: number; top: number; bottom: number } | null;
   submission: SubmissionLike | null;
+  role: "CLIENT" | "AGENCY";
   onRequestInterview: (submissionId: string) => void | Promise<void>;
   onDecline: (submissionId: string) => void | Promise<void>;
   onAddFeedback: (submissionId: string, note: string) => void | Promise<void>;
+  onMarkInterested: (submissionId: string) => void | Promise<void>;
+  onMarkPass: (submissionId: string) => void | Promise<void>;
+  onNeedInfo: (submissionId: string) => void | Promise<void>;
+  onMakeOffer: (submissionId: string) => void | Promise<void>;
+  onOfferAccepted: (submissionId: string) => void | Promise<void>;
+  onOfferDeclined: (submissionId: string) => void | Promise<void>;
+  onSetOwner?: (submissionId: string, ownerName: string) => void | Promise<void>;
 }) {
+  const router = useRouter();
   const [note, setNote] = React.useState("");
+  const [ownerInput, setOwnerInput] = React.useState("");
   const [busy, setBusy] = React.useState<null | "interview" | "decline" | "feedback">(null);
+  const [activeTab, setActiveTab] = React.useState<"WRITEUP" | "RESUME">("WRITEUP");
+  const [resumeUploading, setResumeUploading] = React.useState(false);
+  const [resumeError, setResumeError] = React.useState<string | null>(null);
+  const [isDragging, setIsDragging] = React.useState(false);
+  const resumeInputRef = React.useRef<HTMLInputElement>(null);
 
-  // reset note when opening a different submission
+  const RESUME_ALLOWED_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+  const uploadResumeFile = React.useCallback(
+    async (file: File) => {
+      const candidateId = submission?.candidate?.id;
+      if (!candidateId) return;
+      const valid =
+        RESUME_ALLOWED_TYPES.includes(file.type) ||
+        /\.(pdf|doc|docx)$/i.test(file.name);
+      if (!valid) {
+        setResumeError("Please upload a PDF, DOC, or DOCX file.");
+        return;
+      }
+      setResumeError(null);
+      setResumeUploading(true);
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const res = await fetch(`/api/candidates/${candidateId}/resume`, {
+          method: "POST",
+          body: form,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setResumeError(data.error || "Upload failed");
+          return;
+        }
+        router.refresh();
+      } catch {
+        setResumeError("Upload failed");
+      } finally {
+        setResumeUploading(false);
+      }
+    },
+    [submission?.candidate?.id, router]
+  );
+
+  function handleResumeDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!resumeUploading) setIsDragging(true);
+  }
+  function handleResumeDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }
+  async function handleResumeDrop(e: React.DragEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (resumeUploading) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await uploadResumeFile(file);
+  }
+
+  // reset note and owner input when opening a different submission
   React.useEffect(() => {
-    if (open) setNote("");
+    if (open) { setNote(""); setOwnerInput(""); }
   }, [open, submission?.id]);
 
   if (!submission) return null;
@@ -69,20 +165,32 @@ export default function CandidateDetailSheet({
   const name = c ? `${c.firstName} ${c.lastName}`.trim() : "Unknown candidate";
   const subtitle = c ? [c.title, c.location].filter(Boolean).join(" • ") : "";
 
-  return (
-    <div className={`fixed inset-0 z-50 ${open ? "" : "pointer-events-none"}`} aria-hidden={!open}>
-      {/* Backdrop */}
-      <div
-        className={`absolute inset-0 bg-black/40 transition-opacity ${open ? "opacity-100" : "opacity-0"}`}
-        onClick={() => onOpenChange(false)}
-      />
+  if (!open || !anchorRect) return null;
 
-      {/* Panel */}
-      <div
-        className={`absolute right-0 top-0 h-full w-full max-w-xl bg-white shadow-xl transition-transform ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
+  const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+  const maxH = vh * 0.8;
+  let left = anchorRect.right + GAP;
+  if (left + POPOVER_WIDTH > vw) left = anchorRect.left - POPOVER_WIDTH - GAP;
+  const top = Math.max(8, Math.min(anchorRect.top, vh - maxH - 8));
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left,
+        top,
+        width: POPOVER_WIDTH,
+        maxHeight: maxH,
+        overflowY: "auto",
+        zIndex: 10000,
+        background: "white",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+        borderRadius: 8,
+        border: "1px solid #e5e7eb",
+      }}
+      aria-hidden={!open}
+    >
         <div className="flex items-start justify-between border-b p-4">
           <div>
             <h2 className="text-xl font-semibold">{name}</h2>
@@ -90,30 +198,112 @@ export default function CandidateDetailSheet({
             <p className="mt-1 text-sm text-gray-600">
               Status: <span className="font-medium">{submission.status}</span>
             </p>
+            <p className="mt-1 text-sm text-gray-600">
+              Owner: <span className="font-medium">{getSubmissionOwnerName(submission) || "—"}</span>
+            </p>
+            {role === "AGENCY" && onSetOwner && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={ownerInput}
+                  onChange={(e) => setOwnerInput(e.target.value)}
+                  placeholder="Set owner name"
+                  className="rounded border border-gray-300 px-2 py-1 text-sm w-40"
+                />
+                <button
+                  type="button"
+                  className="rounded-md border px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+                  disabled={!ownerInput.trim()}
+                  onClick={async () => {
+                    if (!ownerInput.trim()) return;
+                    await onSetOwner(submission.id, ownerInput.trim());
+                    setOwnerInput("");
+                  }}
+                >
+                  Set
+                </button>
+              </div>
+            )}
           </div>
 
           <button className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50" onClick={() => onOpenChange(false)}>
-            Close
+            ✕
           </button>
         </div>
 
+        {/* Tabs - Resume only; Write-up is under Summary */}
+        <div className="border-b px-4 pt-2 flex gap-2 text-sm">
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-t-md border-b-2 ${
+              activeTab === "RESUME"
+                ? "border-sky-500 text-sky-700 font-semibold"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("RESUME")}
+          >
+            Resume
+          </button>
+        </div>
+
+        {activeTab !== "RESUME" && (
         <div className="space-y-6 p-4">
           {/* Actions */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Actions</h3>
 
             <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                disabled={busy !== null}
-                onClick={async () => {
-                  setBusy("interview");
-                  await onRequestInterview(submission.id);
-                  setBusy(null);
-                }}
-              >
-                Request Interview
-              </button>
+              {role === "CLIENT" && (
+                <>
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("interview");
+                      await onRequestInterview(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Request Interview
+                  </button>
+
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("interview");
+                      await onMakeOffer(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Make offer
+                  </button>
+
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("interview");
+                      await onOfferAccepted(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Offer accepted
+                  </button>
+
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("interview");
+                      await onOfferDeclined(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Offer declined
+                  </button>
+                </>
+              )}
 
               <button
                 className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
@@ -127,6 +317,46 @@ export default function CandidateDetailSheet({
               >
                 Decline
               </button>
+
+              {role === "CLIENT" && (
+                <>
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("feedback");
+                      await onMarkInterested(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Interested
+                  </button>
+
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("feedback");
+                      await onMarkPass(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Pass
+                  </button>
+
+                  <button
+                    className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null}
+                    onClick={async () => {
+                      setBusy("feedback");
+                      await onNeedInfo(submission.id);
+                      setBusy(null);
+                    }}
+                  >
+                    Need info
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="mt-4">
@@ -165,6 +395,17 @@ export default function CandidateDetailSheet({
           {/* Summary */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
+            <button
+              type="button"
+              className={`mt-2 px-3 py-1 rounded-t-md border-b-2 text-sm ${
+                activeTab === "WRITEUP"
+                  ? "border-sky-500 text-sky-700 font-semibold"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setActiveTab("WRITEUP")}
+            >
+              Write-up
+            </button>
             <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{c?.summary || "—"}</p>
           </section>
 
@@ -212,7 +453,36 @@ export default function CandidateDetailSheet({
             </div>
           </section>
 
-          {/* Resume */}
+          {/* Messages */}
+          <section>
+            <h3 className="text-sm font-semibold text-gray-700">Messages</h3>
+            <div className="mt-2 space-y-2 text-sm">
+              {submission.messages && submission.messages.length > 0 ? (
+                submission.messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className="rounded-md border bg-white p-2 text-gray-800"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                        {m.fromRole === "CLIENT" ? "Client" : "Agency"}
+                      </span>
+                      {m.createdAt && (
+                        <span className="text-xs text-gray-400">
+                          {formatTimeAgo(m.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-gray-700">{m.body}</div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-gray-400">No messages yet.</div>
+              )}
+            </div>
+          </section>
+
+          {/* Resume link (for context) */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Resume</h3>
             <div className="mt-2">
@@ -226,7 +496,99 @@ export default function CandidateDetailSheet({
             </div>
           </section>
         </div>
-      </div>
+        )}
+
+        {activeTab === "RESUME" && (
+          <div className="p-4 h-[calc(100%-56px)] flex flex-col gap-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab("WRITEUP")}
+              className="self-start text-sm text-sky-600 hover:underline"
+            >
+              ← Write-up
+            </button>
+            {role === "AGENCY" && (
+              <>
+                <input
+                  type="file"
+                  ref={resumeInputRef}
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadResumeFile(f);
+                    e.target.value = "";
+                  }}
+                />
+                <div
+                  tabIndex={0}
+                  onDragEnter={handleResumeDragOver}
+                  onDragOver={handleResumeDragOver}
+                  onDragLeave={handleResumeDragLeave}
+                  onDrop={handleResumeDrop}
+                  style={{
+                    border: isDragging ? "2px dashed #60a5fa" : "1px solid #e5e7eb",
+                    background: isDragging ? "#eff6ff" : "#fff",
+                    borderRadius: 10,
+                    padding: 12,
+                  }}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      disabled={resumeUploading}
+                      onClick={() => resumeInputRef.current?.click()}
+                      className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {resumeUploading ? "Uploading…" : c?.resumeUrl ? "Replace resume" : "Upload resume"}
+                    </button>
+                    {c?.resumeUrl && (
+                      <a
+                        href={c.resumeUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                      >
+                        Download
+                      </a>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-gray-500">or drop PDF, DOC, or DOCX here</p>
+                </div>
+              </>
+            )}
+            {role !== "AGENCY" && c?.resumeUrl && (
+              <div className="flex flex-wrap items-center gap-2">
+                <a
+                  href={c.resumeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                >
+                  Download
+                </a>
+              </div>
+            )}
+            {role === "AGENCY" && resumeError && (
+              <p className="text-sm text-red-600">{resumeError}</p>
+            )}
+            {c?.resumeUrl ? (
+              c.resumeUrl.toLowerCase().endsWith(".pdf") ? (
+                <div className="mt-2 flex-1 min-h-[200px] border rounded overflow-hidden bg-gray-50">
+                  <iframe
+                    src={c.resumeUrl}
+                    title="Resume preview"
+                    className="w-full h-full min-h-[300px] border-0"
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 mt-2">Preview available for PDFs. Download to view.</p>
+              )
+            ) : (
+              <p className="text-sm text-gray-400">No resume uploaded yet.</p>
+            )}
+          </div>
+        )}
     </div>
   );
 }
