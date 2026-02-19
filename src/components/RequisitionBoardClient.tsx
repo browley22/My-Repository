@@ -1335,52 +1335,8 @@ export default function RequisitionBoardClient({
 
   return (
     <>
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10 }}>
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "#0f172a" }}>Submissions</h2>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            gap: 10,
-            padding: "6px 10px",
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            borderRadius: 8,
-            fontSize: 12,
-          }}
-        >
-          <input
-            type="text"
-            value={filterSearchQuery}
-            onChange={(e) => setFilterSearchQuery(e.target.value)}
-            placeholder="Search candidates..."
-            style={{ width: 160, padding: "5px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", color: "#334155" }}
-          />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input type="checkbox" checked={filterNeedsAttentionOnly} onChange={(e) => setFilterNeedsAttentionOnly(e.target.checked)} />
-            <span style={{ color: "#475569" }}>{role === "CLIENT" ? "Need follow-up only" : "Needs Attention only"}</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input type="checkbox" checked={filterOpenQuestionsOnly} onChange={(e) => setFilterOpenQuestionsOnly(e.target.checked)} />
-            <span style={{ color: "#475569" }}>Open Questions only</span>
-          </label>
-          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ color: "#64748b" }}>Status</span>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", color: "#334155" }}>
-              <option value="ALL">All</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="UNDER_REVIEW">Under Review</option>
-              <option value="INTERVIEW_REQUESTED">Interview</option>
-              <option value="OFFER">Offer</option>
-              <option value="CLOSED">Hired</option>
-              <option value="DECLINED">Declined</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <div style={{ position: "sticky", top: 0, zIndex: 40, background: "#fff", borderBottom: "1px solid #e2e8f0", boxShadow: "0 1px 3px 0 rgba(0,0,0,0.06)", marginBottom: 12, display: "flex", alignItems: "center", gap: 0 }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 40, background: "#fff", borderBottom: "1px solid #e2e8f0", boxShadow: "0 1px 3px 0 rgba(0,0,0,0.06)", marginBottom: 12, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 0 }}>
         <div ref={insightsButtonRef} style={{ position: "relative" }}>
           <button
             type="button"
@@ -1857,6 +1813,49 @@ export default function RequisitionBoardClient({
               </div>
             </div>
           )}
+        </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: 10,
+            padding: "6px 10px",
+            background: "#f8fafc",
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            fontSize: 12,
+          }}
+        >
+          <input
+            type="text"
+            value={filterSearchQuery}
+            onChange={(e) => setFilterSearchQuery(e.target.value)}
+            placeholder="Search candidates..."
+            style={{ width: 160, padding: "5px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", color: "#334155" }}
+          />
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={filterNeedsAttentionOnly} onChange={(e) => setFilterNeedsAttentionOnly(e.target.checked)} />
+            <span style={{ color: "#475569" }}>{role === "CLIENT" ? "Need follow-up only" : "Needs Attention only"}</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={filterOpenQuestionsOnly} onChange={(e) => setFilterOpenQuestionsOnly(e.target.checked)} />
+            <span style={{ color: "#475569" }}>Open Questions only</span>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: "#64748b" }}>Status</span>
+            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", color: "#334155" }}>
+              <option value="ALL">All</option>
+              <option value="SUBMITTED">Submitted</option>
+              <option value="UNDER_REVIEW">Under Review</option>
+              <option value="INTERVIEW_REQUESTED">Interview</option>
+              <option value="OFFER">Offer</option>
+              <option value="CLOSED">Hired</option>
+              <option value="DECLINED">Declined</option>
+            </select>
+          </label>
         </div>
       </div>
 
