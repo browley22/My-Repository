@@ -214,6 +214,49 @@ export default function CandidateDetailSheet({
     if (open) { setNote(""); setOwnerInput(""); }
   }, [open, submission?.id]);
 
+  const isResumeTabActive = activeTab === "RESUME" && role === "AGENCY";
+  React.useEffect(() => {
+    function handleGlobalDrop(e: DragEvent) {
+      if (!isResumeTabActive) return;
+      e.preventDefault();
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      let file: File | undefined = dt.files?.[0];
+      if (!file && dt.items) {
+        for (let i = 0; i < dt.items.length; i++) {
+          const item = dt.items[i];
+          if (item.kind === "file") {
+            file = item.getAsFile() ?? undefined;
+            break;
+          }
+        }
+      }
+      if (file) {
+        setDropEventCount((n) => n + 1);
+        setCandidateIdDebug(candidateId);
+        setLastDropFileName(file.name);
+        setLastDropFileType(file.type || "(empty)");
+        setLastDroppedName(file.name);
+        uploadResumeFile(file);
+        setLastUploadStatus("Dropped via global listener");
+      } else {
+        setDropEventCount((n) => n + 1);
+        setCandidateIdDebug(candidateId);
+        setLastUploadStatus("Global drop detected but no file");
+      }
+    }
+    function handleGlobalDragOver(e: DragEvent) {
+      if (!isResumeTabActive) return;
+      e.preventDefault();
+    }
+    document.addEventListener("drop", handleGlobalDrop);
+    document.addEventListener("dragover", handleGlobalDragOver);
+    return () => {
+      document.removeEventListener("drop", handleGlobalDrop);
+      document.removeEventListener("dragover", handleGlobalDragOver);
+    };
+  }, [isResumeTabActive, candidateId, uploadResumeFile]);
+
   if (!submission) return null;
 
   const c = submission.candidate;
