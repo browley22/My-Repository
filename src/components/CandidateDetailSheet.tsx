@@ -105,6 +105,8 @@ export default function CandidateDetailSheet({
   const [dropCount, setDropCount] = React.useState(0);
   const [lastEventTarget, setLastEventTarget] = React.useState("");
   const [localResumeUrl, setLocalResumeUrl] = React.useState<string | null>(null);
+  const [activityExpanded, setActivityExpanded] = React.useState(false);
+  const [messagesExpanded, setMessagesExpanded] = React.useState(false);
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
   const dropInFlightRef = React.useRef(false);
 
@@ -113,6 +115,20 @@ export default function CandidateDetailSheet({
   const effectiveResumeUrl = localResumeUrl ?? initialResumeUrl;
 
   React.useEffect(() => setLocalResumeUrl(null), [effectiveCandidateId]);
+
+  const activity = React.useMemo(() => {
+    if (!submission?.events?.length) return [];
+    return (submission.events as any[])
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [submission?.events]);
+
+  const messages = React.useMemo(() => {
+    if (!submission?.messages?.length) return [];
+    return submission.messages
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }, [submission?.messages]);
 
   const RESUME_ALLOWED_TYPES = [
     "application/pdf",
@@ -361,7 +377,12 @@ export default function CandidateDetailSheet({
           <div>
             <h2 className="text-xl font-semibold">{name}</h2>
             <p className="text-sm text-gray-500">{subtitle}</p>
-            <p className="mt-1 text-sm text-gray-600">
+            <div className="mt-1 text-xs text-gray-500 space-y-0.5">
+              {c?.email && <div>Email: {c.email}</div>}
+              {c?.phone && <div>Phone: {c.phone}</div>}
+              {!c?.email && !c?.phone && <div>No contact info</div>}
+            </div>
+            <p className="mt-2 text-sm text-gray-600">
               Status: <span className="font-medium">{submission.status}</span>
             </p>
             <p className="mt-1 text-sm text-gray-600">
@@ -545,15 +566,6 @@ export default function CandidateDetailSheet({
             </div>
           </section>
 
-          {/* Contact */}
-          <section>
-            <h3 className="text-sm font-semibold text-gray-700">Contact</h3>
-            <div className="mt-2 space-y-1 text-sm text-gray-800">
-              {c?.email ? <div>Email: {c.email}</div> : <div className="text-gray-400">Email: —</div>}
-              {c?.phone ? <div>Phone: {c.phone}</div> : <div className="text-gray-400">Phone: —</div>}
-            </div>
-          </section>
-
           {/* Summary */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
@@ -576,14 +588,9 @@ export default function CandidateDetailSheet({
             <h3 className="text-sm font-semibold text-gray-700">Activity</h3>
 
             <div className="mt-2 space-y-2 text-sm">
-              {submission.events && submission.events.length > 0 ? (
-                submission.events
-                  .slice()
-                  .sort(
-                    (a: any, b: any) =>
-                      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                  )
-                  .map((e: any) => (
+              {activity.length > 0 ? (
+                <>
+                  {(activityExpanded ? activity : activity.slice(0, 5)).map((e: any) => (
                     <div key={e.id} className="rounded-md border p-2 bg-gray-50 text-gray-800">
                       <div className="font-medium">
                         {e.type === "STATUS_CHANGE"
@@ -608,7 +615,17 @@ export default function CandidateDetailSheet({
 
                       <div className="text-xs text-gray-400">{formatTimeAgo(e.createdAt)}</div>
                     </div>
-                  ))
+                  ))}
+                  {activity.length > 5 && (
+                    <button
+                      type="button"
+                      className="text-xs text-sky-600 hover:underline"
+                      onClick={() => setActivityExpanded((v) => !v)}
+                    >
+                      {activityExpanded ? "Show less" : `Show all (${activity.length})`}
+                    </button>
+                  )}
+                </>
               ) : (
                 <div className="text-gray-400">No activity yet.</div>
               )}
@@ -619,25 +636,36 @@ export default function CandidateDetailSheet({
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Messages</h3>
             <div className="mt-2 space-y-2 text-sm">
-              {submission.messages && submission.messages.length > 0 ? (
-                submission.messages.map((m) => (
-                  <div
-                    key={m.id}
-                    className="rounded-md border bg-white p-2 text-gray-800"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                        {m.fromRole === "CLIENT" ? "Client" : "Agency"}
-                      </span>
-                      {m.createdAt && (
-                        <span className="text-xs text-gray-400">
-                          {formatTimeAgo(m.createdAt)}
+              {messages.length > 0 ? (
+                <>
+                  {(messagesExpanded ? messages : messages.slice(0, 5)).map((m) => (
+                    <div
+                      key={m.id}
+                      className="rounded-md border bg-white p-2 text-gray-800"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                          {m.fromRole === "CLIENT" ? "Client" : "Agency"}
                         </span>
-                      )}
+                        {m.createdAt && (
+                          <span className="text-xs text-gray-400">
+                            {formatTimeAgo(m.createdAt)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-gray-700">{m.body}</div>
                     </div>
-                    <div className="mt-1 text-gray-700">{m.body}</div>
-                  </div>
-                ))
+                  ))}
+                  {messages.length > 5 && (
+                    <button
+                      type="button"
+                      className="text-xs text-sky-600 hover:underline"
+                      onClick={() => setMessagesExpanded((v) => !v)}
+                    >
+                      {messagesExpanded ? "Show less" : `Show all (${messages.length})`}
+                    </button>
+                  )}
+                </>
               ) : (
                 <div className="text-gray-400">No messages yet.</div>
               )}
