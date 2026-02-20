@@ -460,7 +460,6 @@ export default function CandidateDetailSheet({
 
         {role === "CLIENT" && activeTab === "YOUR_DECISION" && (
         <div className="space-y-4 p-4">
-          <h3 className="text-sm font-semibold text-gray-700">Your Decision</h3>
           <div className="grid grid-cols-1 gap-2">
             <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Positive</div>
             <div className="flex flex-wrap gap-2">
