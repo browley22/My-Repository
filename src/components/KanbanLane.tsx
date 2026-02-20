@@ -504,10 +504,7 @@ function DraggableCard({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ fontWeight: 600 }}>
-              {fullName}
-              {rank != null && (
-                <span style={{ fontWeight: 500, color: "#6b7280", marginLeft: 4 }}>#{rank}</span>
-              )}
+              {fullName}{rank != null ? ` #${rank}` : ""}
             </div>
             {submission.fitScore !== null && submission.fitScore !== undefined && (
               <div
