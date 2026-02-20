@@ -79,24 +79,11 @@ export async function POST(
       },
     });
 
-    // Temporary server logs for ranking debug
+    // Auto-evaluate after create: persist fitScore so ranking works. Never block creation.
     const jobDescription = requisition.jobDescription ?? null;
-    const jobDescriptionLength = jobDescription ? jobDescription.length : 0;
     const resumeText = ""; // at create time candidate has no resume yet
-    const resumeTextLength = 0;
-    console.log("[submission-create]", {
-      requisitionId,
-      candidateId: candidate.id,
-      submissionId: submission.id,
-      jobDescriptionExists: jobDescriptionLength > 0,
-      jobDescriptionLength,
-      resumeTextExists: resumeTextLength > 0,
-      resumeTextLength,
-    });
+    let evaluationQueued = false;
 
-    // Auto-evaluate: persist fitScore so ranking works. Fallback to deterministic score if evaluation fails.
-    let evaluationQueued = true;
-    /** Deterministic fallback when evaluation fails or inputs missing (temporary). */
     const fallbackFitScore = (): number => {
       const jd = jobDescription || "";
       const words = jd.split(/\s+/).filter(Boolean).length;
@@ -109,9 +96,7 @@ export async function POST(
         jobDescription: jobDescription || undefined,
         recruiterNotes: "",
       });
-      console.log("[submission-create] evaluation output fitScore:", evaluation.fitScore);
 
-      // Persist evaluation fields first (no nested event) so fitScore is never lost
       await prisma.submission.update({
         where: { id: submission.id },
         data: {
@@ -127,7 +112,6 @@ export async function POST(
       });
       evaluationQueued = false;
 
-      // Optional: create AI_EVALUATION event separately so it cannot break the fitScore update
       try {
         const payload = createEventPayload({
           type: "AI_EVALUATION",
@@ -146,13 +130,16 @@ export async function POST(
       }
     } catch (evalErr) {
       console.error("Auto-evaluate after submission create:", evalErr);
-      const score = fallbackFitScore();
-      console.log("[submission-create] using fallback fitScore:", score);
-      await prisma.submission.update({
-        where: { id: submission.id },
-        data: { fitScore: score, evaluatedAt: new Date() },
-      });
-      evaluationQueued = false;
+      try {
+        const score = fallbackFitScore();
+        await prisma.submission.update({
+          where: { id: submission.id },
+          data: { fitScore: score, evaluatedAt: new Date() },
+        });
+        evaluationQueued = false;
+      } catch (fallbackErr) {
+        console.error("Fallback fitScore persist failed; submission created with fitScore null:", fallbackErr);
+      }
     }
 
     return NextResponse.json(
