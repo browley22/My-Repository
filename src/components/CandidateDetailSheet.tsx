@@ -200,7 +200,7 @@ export default function CandidateDetailSheet({
         const resumeUrl = typeof data?.resumeUrl === "string" ? data.resumeUrl : null;
         if (resumeUrl) {
           setLocalResumeUrl(resumeUrl);
-          setLastUploadStatus("Upload success");
+          setLastUploadStatus(typeof data?.warning === "string" ? data.warning : "Upload success");
         } else {
           setResumeError("Upload succeeded but server did not return resumeUrl");
           setLastUploadStatus("Upload succeeded but server did not return resumeUrl; keys: " + Object.keys(data || {}).join(", "));

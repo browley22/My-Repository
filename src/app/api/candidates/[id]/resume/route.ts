@@ -4,6 +4,7 @@ import { authOptions } from "../../../auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import mammoth from "mammoth";
 
 const prisma = new PrismaClient();
 
@@ -103,6 +104,18 @@ export async function POST(
 
   const resumeUrl = `/uploads/resumes/${safeName}`;
 
+  let resumeText: string | null = null;
+  const isDocx = ext === ".docx" || ext === ".doc" || type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || type === "application/msword";
+  if (isDocx) {
+    try {
+      const result = await mammoth.extractRawText({ buffer });
+      const text = (result?.value ?? "").trim();
+      resumeText = text.length > 0 ? text : null;
+    } catch (err) {
+      console.warn("Resume DOCX text extraction failed:", err);
+    }
+  }
+
   const existing = await prisma.candidate.findUnique({
     where: { id: candidateId },
     select: { id: true },
@@ -117,7 +130,7 @@ export async function POST(
   try {
     await prisma.candidate.update({
       where: { id: candidateId },
-      data: { resumeUrl },
+      data: { resumeUrl, resumeText },
     });
   } catch (err: unknown) {
     const message = err && typeof err === "object" && "message" in err ? String((err as { message?: unknown }).message) : String(err);
@@ -128,5 +141,8 @@ export async function POST(
     );
   }
 
-  return NextResponse.json({ resumeUrl }, { status: 200 });
+  const payload: { resumeUrl: string; resumeText?: string | null; warning?: string } = { resumeUrl };
+  if (resumeText != null) payload.resumeText = resumeText;
+  if (isDocx && resumeText == null) payload.warning = "Text extraction failed; file saved. Preview may be unavailable.";
+  return NextResponse.json(payload, { status: 200 });
 }

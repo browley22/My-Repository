@@ -30,6 +30,7 @@ export default function ResumeViewer({
   const hasText = typeof resumeText === "string" && resumeText.trim().length > 0;
   const isPdf = resumeUrl ? isPdfUrl(resumeUrl) : false;
   const title = candidateName ? `Resume: ${candidateName}` : "Resume";
+  const subtitle = hasText ? " (Extracted text preview)" : null;
 
   const handleDownload = React.useCallback(() => {
     if (!resumeUrl) return;
@@ -180,7 +181,10 @@ export default function ResumeViewer({
                 justifyContent: "space-between",
               }}
             >
-              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "#111827" }}>{title}</h2>
+              <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: "#111827" }}>
+              {title}
+              {subtitle && <span style={{ fontSize: 14, fontWeight: 400, color: "#6b7280" }}>{subtitle}</span>}
+            </h2>
               <button
                 type="button"
                 onClick={onClose}
