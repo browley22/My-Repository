@@ -535,7 +535,57 @@ function DraggableCard({
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontWeight: 600 }}>{fullName}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 600 }}>{fullName}</span>
+              {rank === 1 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "1px 5px",
+                    borderRadius: 4,
+                    background: "#fef3c7",
+                    color: "#b45309",
+                    border: "1px solid #f59e0b",
+                  }}
+                  title="Top match"
+                >
+                  #1
+                </span>
+              )}
+              {rank === 2 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "1px 5px",
+                    borderRadius: 4,
+                    background: "#f1f5f9",
+                    color: "#475569",
+                    border: "1px solid #94a3b8",
+                  }}
+                  title="Second match"
+                >
+                  #2
+                </span>
+              )}
+              {rank === 3 && (
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "1px 5px",
+                    borderRadius: 4,
+                    background: "#fef7ed",
+                    color: "#9a3412",
+                    border: "1px solid #c2410c",
+                  }}
+                  title="Third match"
+                >
+                  #3
+                </span>
+              )}
+            </div>
             <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 400 }}>
               {rank != null ? `AI Match Rank #${rank}` : "AI Match Rank"}
             </div>
