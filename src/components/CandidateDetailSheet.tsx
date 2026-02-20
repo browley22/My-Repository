@@ -46,6 +46,14 @@ type SubmissionLike = {
     body: string;
     createdAt?: string;
   }[];
+  fitScore?: number | null;
+  fitSummary?: string | null;
+  strengths?: string[] | null;
+  gaps?: string[] | null;
+  sellingPoints?: string[] | null;
+  objectionsAndRebuttals?: { objection: string; rebuttal: string }[] | null;
+  confidence?: number | null;
+  evaluatedAt?: string | null;
 };
 
 const POPOVER_WIDTH = 420;
@@ -90,11 +98,22 @@ export default function CandidateDetailSheet({
   const router = useRouter();
   const [note, setNote] = React.useState("");
   const [ownerInput, setOwnerInput] = React.useState("");
-  const [busy, setBusy] = React.useState<null | "interview" | "decline" | "feedback">(null);
+  const [busy, setBusy] = React.useState<null | "interview" | "decline" | "feedback" | "evaluate">(null);
   const [activeTab, setActiveTab] = React.useState<"WRITEUP" | "RESUME" | "YOUR_DECISION">("WRITEUP");
   const [feedbackModalOpen, setFeedbackModalOpen] = React.useState(false);
   const [feedbackModalText, setFeedbackModalText] = React.useState("");
   const [feedbackSuccess, setFeedbackSuccess] = React.useState(false);
+  const [evaluationLoading, setEvaluationLoading] = React.useState(false);
+  const [localEvaluation, setLocalEvaluation] = React.useState<{
+    fitScore: number;
+    fitSummary: string | null;
+    strengths: string[] | null;
+    gaps: string[] | null;
+    sellingPoints: string[] | null;
+    objectionsAndRebuttals: { objection: string; rebuttal: string }[] | null;
+    confidence: number | null;
+    evaluatedAt: string | null;
+  } | null>(null);
   const [resumeUploading, setResumeUploading] = React.useState(false);
   const [resumeError, setResumeError] = React.useState<string | null>(null);
   const [isDragging, setIsDragging] = React.useState(false);
@@ -497,6 +516,198 @@ export default function CandidateDetailSheet({
           </section>
           )}
 
+          {/* AI Fit - AGENCY only */}
+          {role === "AGENCY" && (
+          <section>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700">AI Fit</h3>
+              {(!submission?.evaluatedAt && !localEvaluation) ? (
+                <button
+                  type="button"
+                  className="rounded-md bg-sky-600 text-white px-3 py-1.5 text-xs hover:bg-sky-700 disabled:opacity-50"
+                  disabled={busy !== null || evaluationLoading}
+                  onClick={async () => {
+                    if (!submission?.id) return;
+                    setEvaluationLoading(true);
+                    setBusy("evaluate");
+                    try {
+                      const res = await fetch(`/api/submissions/${submission.id}/evaluate`, {
+                        method: "POST",
+                      });
+                      if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        alert(data.error || "Evaluation failed");
+                        return;
+                      }
+                      const data = await res.json();
+                      setLocalEvaluation(data.evaluation);
+                      router.refresh();
+                    } catch (err) {
+                      alert("Evaluation failed");
+                    } finally {
+                      setEvaluationLoading(false);
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {evaluationLoading ? "Evaluating..." : "Evaluate Fit"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+                  disabled={busy !== null || evaluationLoading}
+                  onClick={async () => {
+                    if (!submission?.id) return;
+                    setEvaluationLoading(true);
+                    setBusy("evaluate");
+                    try {
+                      const res = await fetch(`/api/submissions/${submission.id}/evaluate`, {
+                        method: "POST",
+                      });
+                      if (!res.ok) {
+                        const data = await res.json().catch(() => ({}));
+                        alert(data.error || "Evaluation failed");
+                        return;
+                      }
+                      const data = await res.json();
+                      setLocalEvaluation(data.evaluation);
+                      router.refresh();
+                    } catch (err) {
+                      alert("Evaluation failed");
+                    } finally {
+                      setEvaluationLoading(false);
+                      setBusy(null);
+                    }
+                  }}
+                >
+                  {evaluationLoading ? "Re-evaluating..." : "Re-evaluate"}
+                </button>
+              )}
+            </div>
+
+            {(submission?.fitScore !== null && submission?.fitScore !== undefined) || localEvaluation ? (
+              (() => {
+                const evalData = localEvaluation || {
+                  fitScore: submission?.fitScore ?? 0,
+                  fitSummary: submission?.fitSummary ?? null,
+                  strengths: submission?.strengths ?? null,
+                  gaps: submission?.gaps ?? null,
+                  sellingPoints: submission?.sellingPoints ?? null,
+                  objectionsAndRebuttals: submission?.objectionsAndRebuttals ?? null,
+                  confidence: submission?.confidence ?? null,
+                  evaluatedAt: submission?.evaluatedAt ?? null,
+                };
+                const score = evalData.fitScore;
+                const scoreColor = score >= 80 ? "text-green-700" : score >= 60 ? "text-blue-700" : "text-orange-700";
+                const scoreBg = score >= 80 ? "bg-green-50 border-green-200" : score >= 60 ? "bg-blue-50 border-blue-200" : "bg-orange-50 border-orange-200";
+
+                return (
+                  <div className="mt-2 space-y-4">
+                    {/* Score and Confidence */}
+                    <div className={`rounded-md border p-3 ${scoreBg}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-xs text-gray-600 mb-1">Fit Score</div>
+                          <div className={`text-2xl font-bold ${scoreColor}`}>{score}%</div>
+                        </div>
+                        {evalData.confidence !== null && (
+                          <div className="text-right">
+                            <div className="text-xs text-gray-600 mb-1">Confidence</div>
+                            <div className="text-sm font-medium text-gray-700">
+                              {Math.round((evalData.confidence ?? 0) * 100)}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    {evalData.fitSummary && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-700 mb-1">Summary</div>
+                        <p className="text-sm text-gray-800">{evalData.fitSummary}</p>
+                      </div>
+                    )}
+
+                    {/* Strengths */}
+                    {evalData.strengths && Array.isArray(evalData.strengths) && evalData.strengths.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-700 mb-1">Strengths</div>
+                        <ul className="text-sm text-gray-800 space-y-1">
+                          {evalData.strengths.map((s, i) => (
+                            <li key={i} className="flex items-start">
+                              <span className="text-green-600 mr-2">+</span>
+                              <span>{s}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Gaps */}
+                    {evalData.gaps && Array.isArray(evalData.gaps) && evalData.gaps.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-700 mb-1">Gaps</div>
+                        <ul className="text-sm text-gray-800 space-y-1">
+                          {evalData.gaps.map((g, i) => (
+                            <li key={i} className="flex items-start">
+                              <span className="text-orange-600 mr-2">−</span>
+                              <span>{g}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Selling Points */}
+                    {evalData.sellingPoints && Array.isArray(evalData.sellingPoints) && evalData.sellingPoints.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-700 mb-1">Selling Points</div>
+                        <ul className="text-sm text-gray-800 space-y-1">
+                          {evalData.sellingPoints.map((sp, i) => (
+                            <li key={i} className="flex items-start">
+                              <span className="text-blue-600 mr-2">•</span>
+                              <span>{sp}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Objections & Rebuttals */}
+                    {evalData.objectionsAndRebuttals && Array.isArray(evalData.objectionsAndRebuttals) && evalData.objectionsAndRebuttals.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-gray-700 mb-2">Objections & Rebuttals</div>
+                        <div className="space-y-3">
+                          {evalData.objectionsAndRebuttals.map((or, i) => (
+                            <div key={i} className="rounded-md border p-2 bg-gray-50">
+                              <div className="text-xs font-medium text-red-700 mb-1">Objection:</div>
+                              <div className="text-sm text-gray-800 mb-2">{or.objection}</div>
+                              <div className="text-xs font-medium text-green-700 mb-1">Rebuttal:</div>
+                              <div className="text-sm text-gray-800">{or.rebuttal}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {evalData.evaluatedAt && (
+                      <div className="text-xs text-gray-500">
+                        Evaluated {formatTimeAgo(evalData.evaluatedAt)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
+            ) : (
+              <div className="text-sm text-gray-500 mt-2">
+                No evaluation yet. Click "Evaluate Fit" to analyze candidate fit.
+              </div>
+            )}
+          </section>
+          )}
+
           {/* Summary */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
@@ -528,6 +739,8 @@ export default function CandidateDetailSheet({
                           ? "Status changed"
                           : e.type === "QUESTION"
                           ? "Note"
+                          : e.type === "AI_EVALUATION"
+                          ? "AI Evaluation"
                           : e.type}
                       </div>
 

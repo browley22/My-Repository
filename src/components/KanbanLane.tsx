@@ -20,7 +20,7 @@ type Submission = {
     fromRole: "CLIENT" | "AGENCY";
     createdAt?: string | null;
   }[];
-
+  fitScore?: number | null;
   candidate: {
     id?: string;
     firstName: string;
@@ -494,8 +494,23 @@ function DraggableCard({
             display: "block",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ fontWeight: 600 }}>{fullName}</div>
+            {submission.fitScore !== null && submission.fitScore !== undefined && (
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  background: submission.fitScore >= 80 ? "#dcfce7" : submission.fitScore >= 60 ? "#dbeafe" : "#fef3c7",
+                  color: submission.fitScore >= 80 ? "#166534" : submission.fitScore >= 60 ? "#1e40af" : "#92400e",
+                  border: `1px solid ${submission.fitScore >= 80 ? "#86efac" : submission.fitScore >= 60 ? "#93c5fd" : "#fde68a"}`,
+                }}
+              >
+                Fit {submission.fitScore}
+              </div>
+            )}
           </div>
           {submission.candidate.title && (
   <div style={{ fontSize: 12, color: "#6b7280" }}>

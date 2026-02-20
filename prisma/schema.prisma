@@ -28,6 +28,7 @@ enum DecisionType {
   MAKE_OFFER
   DECLINE
   QUESTION
+  AI_EVALUATION
 }
 
 enum DeclineReason {
@@ -85,16 +86,24 @@ model Candidate {
 }
 
 model Submission {
-  id             String           @id @default(cuid())
-  requisitionId  String
-  requisition    Requisition      @relation(fields: [requisitionId], references: [id])
-  candidateId    String
-  candidate      Candidate        @relation(fields: [candidateId], references: [id])
-  status         SubmissionStatus @default(SUBMITTED)
-  messages       Message[]
-  events         DecisionEvent[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                     String           @id @default(cuid())
+  requisitionId          String
+  requisition            Requisition      @relation(fields: [requisitionId], references: [id])
+  candidateId            String
+  candidate              Candidate        @relation(fields: [candidateId], references: [id])
+  status                 SubmissionStatus @default(SUBMITTED)
+  messages               Message[]
+  events                 DecisionEvent[]
+  fitScore               Int?
+  fitSummary             String?
+  strengths              Json?            // string[]
+  gaps                   Json?            // string[]
+  sellingPoints          Json?            // string[]
+  objectionsAndRebuttals Json?            // { objection: string, rebuttal: string }[]
+  confidence             Float?
+  evaluatedAt            DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   @@index([requisitionId])
   @@index([candidateId])

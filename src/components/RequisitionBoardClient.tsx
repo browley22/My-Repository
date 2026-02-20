@@ -39,6 +39,14 @@ type SubmissionLike = {
     fromRole: "CLIENT" | "AGENCY";
     createdAt?: string | null;
   }[];
+  fitScore?: number | null;
+  fitSummary?: string | null;
+  strengths?: string[] | null;
+  gaps?: string[] | null;
+  sellingPoints?: string[] | null;
+  objectionsAndRebuttals?: { objection: string; rebuttal: string }[] | null;
+  confidence?: number | null;
+  evaluatedAt?: string | null;
 };
 
 export default function RequisitionBoardClient({
