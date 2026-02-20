@@ -980,6 +980,22 @@ export default function RequisitionBoardClient({
     return list;
   }, [submissions, role, queueView, currentUserDisplayName, filterNeedsAttentionOnly, filterOpenQuestionsOnly, filterStatus, filterSearchQuery, needAttentionIds, openQuestionIds]);
 
+  // AI rank per requisition: 1 = best fitScore, only for submissions with fitScore
+  const rankBySubmissionId = React.useMemo(() => {
+    const withScore = submissions.filter((s) => s.fitScore != null);
+    const sorted = [...withScore].sort((a, b) => {
+      const scoreA = a.fitScore ?? 0;
+      const scoreB = b.fitScore ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      const timeA = new Date((a as any).evaluatedAt ?? (a as any).updatedAt ?? (a as any).createdAt ?? 0).getTime();
+      const timeB = new Date((b as any).evaluatedAt ?? (b as any).updatedAt ?? (b as any).createdAt ?? 0).getTime();
+      return timeB - timeA;
+    });
+    const map = new Map<string, number>();
+    sorted.forEach((s, i) => map.set(s.id, i + 1));
+    return map;
+  }, [submissions]);
+
   const getNextStatus = (status: string): string | null => {
     const map: Record<string, string> = {
       SUBMITTED: "UNDER_REVIEW",
