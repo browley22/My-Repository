@@ -52,6 +52,7 @@ type Props = {
   onOfferDeclined?: (submissionId: string) => void | Promise<void>;
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
+  onOpenResumeViewer?: (url: string, candidateName?: string, filename?: string) => void;
 };
 
 const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
@@ -128,6 +129,7 @@ function DraggableCard({
   onOfferDeclined,
   onMarkPass,
   onAddFeedback,
+  onOpenResumeViewer,
 }: {
   submission: Submission;
   onClick?: (e: React.MouseEvent<HTMLElement>, submission: Submission) => void;
@@ -141,6 +143,7 @@ function DraggableCard({
   onOfferDeclined?: (submissionId: string) => void | Promise<void>;
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
+  onOpenResumeViewer?: (url: string, candidateName?: string, filename?: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -673,20 +676,29 @@ function DraggableCard({
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {submission.candidate.resumeUrl && (
-            <a
-              href={submission.candidate.resumeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onOpenResumeViewer?.(
+                  submission.candidate.resumeUrl!,
+                  [submission.candidate.firstName, submission.candidate.lastName].filter(Boolean).join(" ") || undefined,
+                  submission.candidate.resumeUrl?.split("/").pop() || undefined
+                );
+              }}
               style={{
+                background: "none",
+                border: "none",
+                padding: 0,
                 textDecoration: "none",
                 fontSize: 14,
                 cursor: "pointer",
               }}
-              title="Open resume"
+              title="View resume"
             >
               📄
-            </a>
+            </button>
           )}
 
           <div
@@ -746,6 +758,7 @@ function DroppableColumn({
   onOfferDeclined,
   onMarkPass,
   onAddFeedback,
+  onOpenResumeViewer,
 }: {
   status: string;
   submissions: Submission[];
@@ -760,6 +773,7 @@ function DroppableColumn({
   onOfferDeclined?: (submissionId: string) => void | Promise<void>;
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
+  onOpenResumeViewer?: (url: string, candidateName?: string, filename?: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -801,6 +815,7 @@ function DroppableColumn({
           onOfferDeclined={onOfferDeclined}
           onMarkPass={onMarkPass}
           onAddFeedback={onAddFeedback}
+          onOpenResumeViewer={onOpenResumeViewer}
         />
       ))}
     </div>
@@ -823,6 +838,7 @@ export default function KanbanLane({
   onOfferDeclined,
   onMarkPass,
   onAddFeedback,
+  onOpenResumeViewer,
 }: Props) {
   const [sortMode, setSortMode] = React.useState<"OLDEST" | "NEWEST" | "PRIORITY">("OLDEST");
   const [staleOnly, setStaleOnly] = React.useState(false);
@@ -1082,6 +1098,7 @@ export default function KanbanLane({
             onOfferDeclined={onOfferDeclined}
             onMarkPass={onMarkPass}
             onAddFeedback={onAddFeedback}
+            onOpenResumeViewer={onOpenResumeViewer}
           />
         ))}
       </div>

@@ -77,6 +77,7 @@ export default function CandidateDetailSheet({
   onOfferAccepted,
   onOfferDeclined,
   onSetOwner,
+  onOpenResumeViewer,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -94,6 +95,7 @@ export default function CandidateDetailSheet({
   onOfferAccepted: (submissionId: string) => void | Promise<void>;
   onOfferDeclined: (submissionId: string) => void | Promise<void>;
   onSetOwner?: (submissionId: string, ownerName: string) => void | Promise<void>;
+  onOpenResumeViewer?: (url: string, candidateName?: string, filename?: string) => void;
 }) {
   const router = useRouter();
   const [note, setNote] = React.useState("");
@@ -135,6 +137,8 @@ export default function CandidateDetailSheet({
   const effectiveCandidateId = submission?.candidate?.id ?? candidateId ?? null;
   const initialResumeUrl = submission?.candidate?.resumeUrl ?? null;
   const effectiveResumeUrl = localResumeUrl ?? initialResumeUrl;
+  const candidateName = submission?.candidate ? [submission.candidate.firstName, submission.candidate.lastName].filter(Boolean).join(" ") : undefined;
+  const resumeFilename = effectiveResumeUrl ? effectiveResumeUrl.split("/").pop() || undefined : undefined;
 
   React.useEffect(() => setLocalResumeUrl(null), [effectiveCandidateId]);
 
@@ -821,9 +825,13 @@ export default function CandidateDetailSheet({
             <h3 className="text-sm font-semibold text-gray-700">Resume</h3>
             <div className="mt-2">
               {effectiveResumeUrl ? (
-                <a className="text-sm underline" href={effectiveResumeUrl} target="_blank" rel="noreferrer">
-                  Open resume
-                </a>
+                <button
+                  type="button"
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                  className="text-sm underline text-left bg-transparent border-none cursor-pointer p-0 text-sky-600 hover:text-sky-800"
+                >
+                  View resume
+                </button>
               ) : (
                 <p className="text-sm text-gray-400">No resume uploaded yet.</p>
               )}
@@ -886,14 +894,24 @@ export default function CandidateDetailSheet({
                       {resumeUploading ? "Uploading…" : effectiveResumeUrl ? "Replace resume" : "Upload resume"}
                     </button>
                     {effectiveResumeUrl && (
-                      <a
-                        href={effectiveResumeUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                      >
-                        Download
-                      </a>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                          className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                        >
+                          View resume
+                        </button>
+                        <a
+                          href={effectiveResumeUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          download
+                          className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                        >
+                          Download
+                        </a>
+                      </>
                     )}
                     <button
                       type="button"
@@ -938,10 +956,18 @@ export default function CandidateDetailSheet({
             )}
             {role !== "AGENCY" && effectiveResumeUrl && (
               <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                >
+                  View resume
+                </button>
                 <a
                   href={effectiveResumeUrl}
                   target="_blank"
                   rel="noreferrer"
+                  download
                   className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
                 >
                   Download
@@ -952,17 +978,16 @@ export default function CandidateDetailSheet({
               <p className="text-sm text-red-600">{resumeError}</p>
             )}
             {effectiveResumeUrl ? (
-              effectiveResumeUrl.toLowerCase().endsWith(".pdf") ? (
-                <div className="mt-2 flex-1 min-h-[200px] border rounded overflow-hidden bg-gray-50">
-                  <iframe
-                    src={effectiveResumeUrl}
-                    title="Resume preview"
-                    className="w-full h-full min-h-[300px] border-0"
-                  />
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500 mt-2">Preview available for PDFs. Download to view.</p>
-              )
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                  className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-sm text-sky-700 hover:bg-sky-100"
+                >
+                  View resume
+                </button>
+                <p className="text-sm text-gray-500">Open in-app viewer with preview and Download.</p>
+              </div>
             ) : (
               <p className="text-sm text-gray-400">No resume uploaded yet.</p>
             )}

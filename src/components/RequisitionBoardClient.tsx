@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import KanbanLane from "@/components/KanbanLane";
 import CandidateDetailSheet from "@/components/CandidateDetailSheet";
+import ResumeViewer from "@/components/ResumeViewer";
 import { getSubmissionOwnerName } from "@/lib/submission-owner";
 
 type CandidateLike = {
@@ -138,6 +139,12 @@ export default function RequisitionBoardClient({
     top: number;
     bottom: number;
   } | null>(null);
+  const [resumeViewer, setResumeViewer] = React.useState<{
+    open: boolean;
+    url: string | null;
+    candidateName?: string | null;
+    filename?: string | null;
+  }>({ open: false, url: null });
   const [weeklyUpdateOpen, setWeeklyUpdateOpen] = React.useState(false);
   const [weeklyUpdateTemplate, setWeeklyUpdateTemplate] = React.useState<"Internal" | "Client">("Internal");
   const [weeklyUpdateClientName, setWeeklyUpdateClientName] = React.useState("");
@@ -2335,6 +2342,7 @@ export default function RequisitionBoardClient({
           onOfferDeclined={role === "CLIENT" ? onOfferDeclined : undefined}
           onMarkPass={role === "CLIENT" ? onMarkPass : undefined}
           onAddFeedback={role === "CLIENT" ? onAddFeedback : undefined}
+          onOpenResumeViewer={(url, candidateName, filename) => setResumeViewer({ open: true, url, candidateName, filename })}
         />
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
@@ -2556,6 +2564,21 @@ export default function RequisitionBoardClient({
                   }
                 : undefined
             }
+            onOpenResumeViewer={(url, candidateName, filename) => setResumeViewer({ open: true, url, candidateName, filename })}
+          />,
+          document.body
+        )}
+
+      {mounted &&
+        resumeViewer.open &&
+        resumeViewer.url &&
+        createPortal(
+          <ResumeViewer
+            open={resumeViewer.open}
+            onClose={() => setResumeViewer({ open: false, url: null })}
+            resumeUrl={resumeViewer.url}
+            resumeFilename={resumeViewer.filename}
+            candidateName={resumeViewer.candidateName}
           />,
           document.body
         )}
