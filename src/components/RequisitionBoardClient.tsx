@@ -90,6 +90,17 @@ export default function RequisitionBoardClient({
   const [now, setNow] = useState(Date.now());
   const [mounted, setMounted] = useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
+  const [newCandidateModalOpen, setNewCandidateModalOpen] = React.useState(false);
+  const [newCandidateTab, setNewCandidateTab] = React.useState<"quick" | "resume">("quick");
+  const [quickFirstName, setQuickFirstName] = React.useState("");
+  const [quickLastName, setQuickLastName] = React.useState("");
+  const [quickEmail, setQuickEmail] = React.useState("");
+  const [quickPhone, setQuickPhone] = React.useState("");
+  const [quickTitle, setQuickTitle] = React.useState("");
+  const [newCandidateBusy, setNewCandidateBusy] = React.useState(false);
+  const [newCandidateError, setNewCandidateError] = React.useState<string | null>(null);
+  const [resumeFile, setResumeFile] = React.useState<File | null>(null);
+  const [resumeUploadStatus, setResumeUploadStatus] = React.useState<string | null>(null);
 
   const handleMove = React.useCallback(
     async (submissionId: string, newStatus: string) => {
@@ -1857,6 +1868,16 @@ export default function RequisitionBoardClient({
             </select>
           </label>
         </div>
+
+        {role === "AGENCY" && (
+          <button
+            type="button"
+            onClick={() => { setNewCandidateModalOpen(true); setNewCandidateTab("quick"); setNewCandidateError(null); setResumeFile(null); setResumeUploadStatus(null); }}
+            style={{ padding: "6px 12px", fontSize: 12, border: "1px solid #0ea5e9", borderRadius: 8, background: "#0ea5e9", color: "#fff", cursor: "pointer", fontWeight: 500 }}
+          >
+            + New Candidate
+          </button>
+        )}
       </div>
 
       <div
@@ -1889,6 +1910,180 @@ export default function RequisitionBoardClient({
           <button type="button" onClick={() => setWeeklyUpdateOpen(true)} style={{ padding: "4px 8px", fontSize: 11, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", cursor: "pointer", color: "#475569" }}>Weekly Update</button>
         </div>
       </div>
+
+      {newCandidateModalOpen && role === "AGENCY" && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.4)",
+          }}
+          onClick={() => !newCandidateBusy && setNewCandidateModalOpen(false)}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 8,
+              border: "1px solid #e2e8f0",
+              width: "100%",
+              maxWidth: 420,
+              maxHeight: "85vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 20px 25px -5px rgba(0,0,0,0.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>New Candidate</span>
+              <button type="button" onClick={() => !newCandidateBusy && setNewCandidateModalOpen(false)} style={{ padding: "4px 8px", fontSize: 12, border: "none", background: "transparent", cursor: newCandidateBusy ? "not-allowed" : "pointer", color: "#64748b" }}>Cancel</button>
+            </div>
+            <div style={{ display: "flex", borderBottom: "1px solid #e2e8f0" }}>
+              <button type="button" onClick={() => setNewCandidateTab("quick")} style={{ padding: "8px 14px", fontSize: 12, border: "none", borderBottom: newCandidateTab === "quick" ? "2px solid #0ea5e9" : "2px solid transparent", background: "none", cursor: "pointer", color: newCandidateTab === "quick" ? "#0369a1" : "#64748b", fontWeight: newCandidateTab === "quick" ? 600 : 400 }}>Quick Create</button>
+              <button type="button" onClick={() => setNewCandidateTab("resume")} style={{ padding: "8px 14px", fontSize: 12, border: "none", borderBottom: newCandidateTab === "resume" ? "2px solid #0ea5e9" : "2px solid transparent", background: "none", cursor: "pointer", color: newCandidateTab === "resume" ? "#0369a1" : "#64748b", fontWeight: newCandidateTab === "resume" ? 600 : 400 }}>From Resume</button>
+            </div>
+            <div style={{ padding: 16, overflowY: "auto", flex: 1 }}>
+              {newCandidateTab === "quick" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <label style={{ fontSize: 12, color: "#374151" }}>
+                    First name *
+                    <input type="text" value={quickFirstName} onChange={(e) => setQuickFirstName(e.target.value)} placeholder="First name" style={{ display: "block", marginTop: 4, width: "100%", padding: "6px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, boxSizing: "border-box" }} />
+                  </label>
+                  <label style={{ fontSize: 12, color: "#374151" }}>
+                    Last name *
+                    <input type="text" value={quickLastName} onChange={(e) => setQuickLastName(e.target.value)} placeholder="Last name" style={{ display: "block", marginTop: 4, width: "100%", padding: "6px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, boxSizing: "border-box" }} />
+                  </label>
+                  <label style={{ fontSize: 12, color: "#374151" }}>
+                    Email (optional)
+                    <input type="text" value={quickEmail} onChange={(e) => setQuickEmail(e.target.value)} placeholder="Email" style={{ display: "block", marginTop: 4, width: "100%", padding: "6px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, boxSizing: "border-box" }} />
+                  </label>
+                  <label style={{ fontSize: 12, color: "#374151" }}>
+                    Phone (optional)
+                    <input type="text" value={quickPhone} onChange={(e) => setQuickPhone(e.target.value)} placeholder="Phone" style={{ display: "block", marginTop: 4, width: "100%", padding: "6px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, boxSizing: "border-box" }} />
+                  </label>
+                  <label style={{ fontSize: 12, color: "#374151" }}>
+                    Title (optional)
+                    <input type="text" value={quickTitle} onChange={(e) => setQuickTitle(e.target.value)} placeholder="Title" style={{ display: "block", marginTop: 4, width: "100%", padding: "6px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, boxSizing: "border-box" }} />
+                  </label>
+                  {newCandidateError && <p style={{ fontSize: 12, color: "#dc2626" }}>{newCandidateError}</p>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button type="button" onClick={() => !newCandidateBusy && setNewCandidateModalOpen(false)} style={{ padding: "6px 12px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", cursor: newCandidateBusy ? "not-allowed" : "pointer" }}>Cancel</button>
+                    <button
+                      type="button"
+                      disabled={newCandidateBusy || !quickFirstName.trim() || !quickLastName.trim()}
+                      onClick={async () => {
+                        setNewCandidateError(null);
+                        setNewCandidateBusy(true);
+                        try {
+                          const res = await fetch(`${typeof window !== "undefined" ? window.location.origin : ""}/api/requisitions/${requisitionId}/submissions/new`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              firstName: quickFirstName.trim(),
+                              lastName: quickLastName.trim(),
+                              email: quickEmail.trim() || undefined,
+                              phone: quickPhone.trim() || undefined,
+                              title: quickTitle.trim() || undefined,
+                            }),
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (!res.ok) {
+                            setNewCandidateError(typeof data?.error === "string" ? data.error : "Failed to create");
+                            return;
+                          }
+                          setQuickFirstName(""); setQuickLastName(""); setQuickEmail(""); setQuickPhone(""); setQuickTitle("");
+                          setNewCandidateModalOpen(false);
+                          router.refresh();
+                        } catch (e) {
+                          setNewCandidateError(e instanceof Error ? e.message : "Failed to create");
+                        } finally {
+                          setNewCandidateBusy(false);
+                        }
+                      }}
+                      style={{ padding: "6px 12px", fontSize: 12, border: "none", borderRadius: 6, background: "#0ea5e9", color: "#fff", cursor: newCandidateBusy ? "not-allowed" : "pointer", fontWeight: 500 }}
+                    >
+                      {newCandidateBusy ? "Creating…" : "Create"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {newCandidateTab === "resume" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <p style={{ fontSize: 12, color: "#64748b" }}>Drop from File Explorer or choose file. PDF, DOC, or DOCX.</p>
+                  <input type="file" id="new-candidate-resume" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; if (f) setResumeFile(f); e.target.value = ""; }} />
+                  <div
+                    style={{ border: "2px dashed #e2e8f0", borderRadius: 8, padding: 24, textAlign: "center", cursor: "pointer", background: resumeFile ? "#f0fdf4" : "#f8fafc" }}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer?.files?.[0]; if (f && /\.(pdf|doc|docx)$/i.test(f.name)) setResumeFile(f); }}
+                    onClick={() => document.getElementById("new-candidate-resume")?.click()}
+                  >
+                    {resumeFile ? <span style={{ fontSize: 12, color: "#16a34a" }}>{resumeFile.name}</span> : <span style={{ fontSize: 12, color: "#64748b" }}>Drop file or click to choose</span>}
+                  </div>
+                  {resumeUploadStatus && <p style={{ fontSize: 12, color: "#64748b" }}>{resumeUploadStatus}</p>}
+                  {newCandidateError && <p style={{ fontSize: 12, color: "#dc2626" }}>{newCandidateError}</p>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button type="button" onClick={() => !newCandidateBusy && setNewCandidateModalOpen(false)} style={{ padding: "6px 12px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", cursor: newCandidateBusy ? "not-allowed" : "pointer" }}>Cancel</button>
+                    <button
+                      type="button"
+                      disabled={newCandidateBusy || !resumeFile}
+                      onClick={async () => {
+                        if (!resumeFile) return;
+                        setNewCandidateError(null);
+                        setNewCandidateBusy(true);
+                        const nameFromFile = (() => { const base = resumeFile.name.replace(/\.(pdf|doc|docx)$/i, ""); const parts = base.split(/[\s_]+/).filter(Boolean); const first = parts[0] || "Candidate"; const last = parts.length > 1 ? parts[parts.length - 1] : "Candidate"; return { firstName: first, lastName: last }; })();
+                        try {
+                          setResumeUploadStatus("Creating candidate…");
+                          const createRes = await fetch(`${typeof window !== "undefined" ? window.location.origin : ""}/api/requisitions/${requisitionId}/submissions/new`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ firstName: nameFromFile.firstName, lastName: nameFromFile.lastName }),
+                          });
+                          const createData = await createRes.json().catch(() => ({}));
+                          if (!createRes.ok) {
+                            setNewCandidateError(typeof createData?.error === "string" ? createData.error : "Failed to create candidate");
+                            return;
+                          }
+                          const candidateId = createData?.candidateId;
+                          if (!candidateId) {
+                            setNewCandidateError("No candidate id returned");
+                            return;
+                          }
+                          setResumeUploadStatus("Uploading resume…");
+                          const form = new FormData();
+                          form.append("file", resumeFile);
+                          const uploadRes = await fetch(`${typeof window !== "undefined" ? window.location.origin : ""}/api/candidates/${candidateId}/resume`, { method: "POST", body: form });
+                          if (!uploadRes.ok) {
+                            const uploadData = await uploadRes.json().catch(() => ({}));
+                            setNewCandidateError(typeof uploadData?.error === "string" ? uploadData.error : "Resume upload failed");
+                            return;
+                          }
+                          setResumeFile(null);
+                          setResumeUploadStatus(null);
+                          setNewCandidateModalOpen(false);
+                          router.refresh();
+                        } catch (e) {
+                          setNewCandidateError(e instanceof Error ? e.message : "Failed");
+                        } finally {
+                          setNewCandidateBusy(false);
+                          setResumeUploadStatus(null);
+                        }
+                      }}
+                      style={{ padding: "6px 12px", fontSize: 12, border: "none", borderRadius: 6, background: "#0ea5e9", color: "#fff", cursor: newCandidateBusy ? "not-allowed" : "pointer", fontWeight: 500 }}
+                    >
+                      {newCandidateBusy ? "Creating…" : "Create & upload"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {weeklyUpdateOpen && (
         <div
