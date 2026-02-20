@@ -9,13 +9,21 @@ function isPdfUrl(url: string): boolean {
   return path.endsWith(".pdf");
 }
 
+function isDocxUrl(url: string): boolean {
+  if (!url) return false;
+  const p = url.split("?")[0].toLowerCase();
+  return p.endsWith(".docx") || p.endsWith(".doc");
+}
+
 export default function ResumeViewer({
   open,
   onClose,
   resumeUrl,
   resumeFilename,
   candidateName,
-  resumeText,
+  resumeText: resumeTextProp,
+  candidateId,
+  onPreviewGenerated,
 }: {
   open: boolean;
   onClose: () => void;
@@ -23,14 +31,48 @@ export default function ResumeViewer({
   resumeFilename?: string | null;
   candidateName?: string | null;
   resumeText?: string | null;
+  candidateId?: string | null;
+  onPreviewGenerated?: (text: string) => void;
 }) {
   const [mounted, setMounted] = React.useState(false);
+  const [localResumeText, setLocalResumeText] = React.useState<string | null>(null);
+  const [extractLoading, setExtractLoading] = React.useState(false);
+  const [extractError, setExtractError] = React.useState<string | null>(null);
   React.useEffect(() => setMounted(true), []);
+  React.useEffect(() => {
+    if (!open) {
+      setLocalResumeText(null);
+      setExtractError(null);
+    }
+  }, [open]);
 
+  const resumeText = localResumeText ?? resumeTextProp;
   const hasText = typeof resumeText === "string" && resumeText.trim().length > 0;
   const isPdf = resumeUrl ? isPdfUrl(resumeUrl) : false;
+  const isDocx = resumeUrl ? isDocxUrl(resumeUrl) : false;
+  const canGeneratePreview = !hasText && !!candidateId && !!resumeUrl && isDocx;
   const title = candidateName ? `Resume: ${candidateName}` : "Resume";
   const subtitle = hasText ? " (Extracted text preview)" : null;
+
+  const handleGeneratePreview = React.useCallback(async () => {
+    if (!candidateId) return;
+    setExtractError(null);
+    setExtractLoading(true);
+    try {
+      const res = await fetch(`/api/candidates/${candidateId}/resume/extract`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = data?.error && data?.detail ? `${data.error} — ${data.detail}` : data?.error || "Extraction failed";
+        setExtractError(msg);
+        return;
+      }
+      const text = typeof data?.resumeText === "string" ? data.resumeText : "";
+      setLocalResumeText(text);
+      onPreviewGenerated?.(text);
+    } finally {
+      setExtractLoading(false);
+    }
+  }, [candidateId, onPreviewGenerated]);
 
   const handleDownload = React.useCallback(() => {
     if (!resumeUrl) return;
@@ -114,7 +156,33 @@ export default function ResumeViewer({
   } else if (resumeUrl) {
     content = (
       <>
-        <p style={{ fontSize: 14, color: "#6b7280" }}>Preview not available for this file type yet.</p>
+        <p style={{ fontSize: 14, color: "#6b7280" }}>
+          {canGeneratePreview ? "Generate a text preview from the .docx file to view it here." : "Preview not available for this file type yet."}
+        </p>
+        {canGeneratePreview && (
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={handleGeneratePreview}
+              disabled={extractLoading}
+              style={{
+                padding: "10px 20px",
+                fontSize: 14,
+                fontWeight: 600,
+                border: "none",
+                borderRadius: 6,
+                background: extractLoading ? "#9ca3af" : "#111827",
+                color: "#fff",
+                cursor: extractLoading ? "not-allowed" : "pointer",
+              }}
+            >
+              {extractLoading ? "Generating…" : "Generate Preview"}
+            </button>
+            {extractError && (
+              <p style={{ marginTop: 8, fontSize: 13, color: "#dc2626" }}>{extractError}</p>
+            )}
+          </div>
+        )}
         <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <a href={resumeUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, color: "#2563eb", textDecoration: "underline" }}>
             Open in new tab

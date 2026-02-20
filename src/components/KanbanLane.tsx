@@ -53,7 +53,7 @@ type Props = {
   onOfferDeclined?: (submissionId: string) => void | Promise<void>;
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
-  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null) => void;
+  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
 };
 
 const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
@@ -144,7 +144,7 @@ function DraggableCard({
   onOfferDeclined?: (submissionId: string) => void | Promise<void>;
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
-  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null) => void;
+  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -686,7 +686,8 @@ function DraggableCard({
                   submission.candidate.resumeUrl ?? null,
                   [submission.candidate.firstName, submission.candidate.lastName].filter(Boolean).join(" ") || undefined,
                   submission.candidate.resumeUrl?.split("/").pop() || undefined,
-                  submission.candidate.resumeText ?? null
+                  submission.candidate.resumeText ?? null,
+                  submission.candidate.id ?? null
                 );
               }}
               style={{
@@ -775,7 +776,7 @@ function DroppableColumn({
   onOfferDeclined?: (submissionId: string) => void | Promise<void>;
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
-  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null) => void;
+  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,

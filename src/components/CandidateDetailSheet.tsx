@@ -96,7 +96,7 @@ export default function CandidateDetailSheet({
   onOfferAccepted: (submissionId: string) => void | Promise<void>;
   onOfferDeclined: (submissionId: string) => void | Promise<void>;
   onSetOwner?: (submissionId: string, ownerName: string) => void | Promise<void>;
-  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null) => void;
+  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
 }) {
   const router = useRouter();
   const [note, setNote] = React.useState("");
@@ -836,7 +836,7 @@ export default function CandidateDetailSheet({
               {hasResume ? (
                 <button
                   type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null, effectiveCandidateId ?? null)}
                   className="text-sm underline text-left bg-transparent border-none cursor-pointer p-0 text-sky-600 hover:text-sky-800"
                 >
                   View resume
@@ -906,7 +906,7 @@ export default function CandidateDetailSheet({
                       <>
                         <button
                           type="button"
-                          onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
+                          onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null, effectiveCandidateId ?? null)}
                           className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
                         >
                           View resume
@@ -969,7 +969,7 @@ export default function CandidateDetailSheet({
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null, effectiveCandidateId ?? null)}
                   className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
                 >
                   View resume
@@ -994,7 +994,7 @@ export default function CandidateDetailSheet({
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null, effectiveCandidateId ?? null)}
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-sm text-sky-700 hover:bg-sky-100"
                 >
                   View resume
