@@ -19,6 +19,7 @@ type CandidateLike = {
   phone?: string | null;
   summary?: string | null;
   resumeUrl?: string | null;
+  resumeText?: string | null;
 };
 
 type DecisionEventLike = {
@@ -144,6 +145,7 @@ export default function RequisitionBoardClient({
     url: string | null;
     candidateName?: string | null;
     filename?: string | null;
+    resumeText?: string | null;
   }>({ open: false, url: null });
   const [weeklyUpdateOpen, setWeeklyUpdateOpen] = React.useState(false);
   const [weeklyUpdateTemplate, setWeeklyUpdateTemplate] = React.useState<"Internal" | "Client">("Internal");
@@ -2342,7 +2344,7 @@ export default function RequisitionBoardClient({
           onOfferDeclined={role === "CLIENT" ? onOfferDeclined : undefined}
           onMarkPass={role === "CLIENT" ? onMarkPass : undefined}
           onAddFeedback={role === "CLIENT" ? onAddFeedback : undefined}
-          onOpenResumeViewer={(url, candidateName, filename) => setResumeViewer({ open: true, url, candidateName, filename })}
+          onOpenResumeViewer={(url, candidateName, filename, resumeText) => setResumeViewer({ open: true, url: url ?? null, candidateName, filename, resumeText })}
         />
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
@@ -2564,21 +2566,22 @@ export default function RequisitionBoardClient({
                   }
                 : undefined
             }
-            onOpenResumeViewer={(url, candidateName, filename) => setResumeViewer({ open: true, url, candidateName, filename })}
+            onOpenResumeViewer={(url, candidateName, filename, resumeText) => setResumeViewer({ open: true, url: url ?? null, candidateName, filename, resumeText })}
           />,
           document.body
         )}
 
       {mounted &&
         resumeViewer.open &&
-        resumeViewer.url &&
+        (resumeViewer.url || resumeViewer.resumeText) &&
         createPortal(
           <ResumeViewer
             open={resumeViewer.open}
-            onClose={() => setResumeViewer({ open: false, url: null })}
+            onClose={() => setResumeViewer({ open: false, url: null, resumeText: null })}
             resumeUrl={resumeViewer.url}
             resumeFilename={resumeViewer.filename}
             candidateName={resumeViewer.candidateName}
+            resumeText={resumeViewer.resumeText}
           />,
           document.body
         )}

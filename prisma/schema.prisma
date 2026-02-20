@@ -82,6 +82,7 @@ model Candidate {
   rate         String?
   availability String?
   resumeUrl    String?       // optional
+  resumeText   String?       // long text for in-app preview (e.g. extracted from docx)
   submissions  Submission[]
   createdAt    DateTime     @default(now())
 }

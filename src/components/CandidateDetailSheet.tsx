@@ -33,6 +33,7 @@ type CandidateLike = {
   phone?: string | null;
   summary?: string | null;
   resumeUrl?: string | null;
+  resumeText?: string | null;
 };
 
 type SubmissionLike = {
@@ -95,7 +96,7 @@ export default function CandidateDetailSheet({
   onOfferAccepted: (submissionId: string) => void | Promise<void>;
   onOfferDeclined: (submissionId: string) => void | Promise<void>;
   onSetOwner?: (submissionId: string, ownerName: string) => void | Promise<void>;
-  onOpenResumeViewer?: (url: string, candidateName?: string, filename?: string) => void;
+  onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null) => void;
 }) {
   const router = useRouter();
   const [note, setNote] = React.useState("");
@@ -139,6 +140,7 @@ export default function CandidateDetailSheet({
   const effectiveResumeUrl = localResumeUrl ?? initialResumeUrl;
   const candidateName = submission?.candidate ? [submission.candidate.firstName, submission.candidate.lastName].filter(Boolean).join(" ") : undefined;
   const resumeFilename = effectiveResumeUrl ? effectiveResumeUrl.split("/").pop() || undefined : undefined;
+  const hasResume = !!effectiveResumeUrl || !!(typeof submission?.candidate?.resumeText === "string" && submission.candidate.resumeText.trim());
 
   React.useEffect(() => setLocalResumeUrl(null), [effectiveCandidateId]);
 
@@ -824,10 +826,10 @@ export default function CandidateDetailSheet({
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Resume</h3>
             <div className="mt-2">
-              {effectiveResumeUrl ? (
+              {hasResume ? (
                 <button
                   type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
                   className="text-sm underline text-left bg-transparent border-none cursor-pointer p-0 text-sky-600 hover:text-sky-800"
                 >
                   View resume
@@ -893,24 +895,26 @@ export default function CandidateDetailSheet({
                     >
                       {resumeUploading ? "Uploading…" : effectiveResumeUrl ? "Replace resume" : "Upload resume"}
                     </button>
-                    {effectiveResumeUrl && (
+                    {hasResume && (
                       <>
                         <button
                           type="button"
-                          onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                          onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
                           className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
                         >
                           View resume
                         </button>
-                        <a
-                          href={effectiveResumeUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          download
-                          className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                        >
-                          Download
-                        </a>
+                        {effectiveResumeUrl && (
+                          <a
+                            href={effectiveResumeUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            download
+                            className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                          >
+                            Download
+                          </a>
+                        )}
                       </>
                     )}
                     <button
@@ -954,34 +958,36 @@ export default function CandidateDetailSheet({
                 </div>
               </>
             )}
-            {role !== "AGENCY" && effectiveResumeUrl && (
+            {role !== "AGENCY" && hasResume && (
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
                   className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
                 >
                   View resume
                 </button>
-                <a
-                  href={effectiveResumeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  download
-                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                >
-                  Download
-                </a>
+                {effectiveResumeUrl && (
+                  <a
+                    href={effectiveResumeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    download
+                    className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
+                  >
+                    Download
+                  </a>
+                )}
               </div>
             )}
             {role === "AGENCY" && resumeError && (
               <p className="text-sm text-red-600">{resumeError}</p>
             )}
-            {effectiveResumeUrl ? (
+            {hasResume ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl, candidateName, resumeFilename)}
+                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null)}
                   className="rounded-md border border-sky-500 bg-sky-50 px-3 py-1.5 text-sm text-sky-700 hover:bg-sky-100"
                 >
                   View resume
