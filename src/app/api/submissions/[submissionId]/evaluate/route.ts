@@ -66,8 +66,11 @@ export async function POST(
     );
   }
 
-  // Extract resume text from candidate summary
-  const resumeText = submission.candidate.summary || null;
+  // Resume text: prefer extracted resumeText; fallback to summary if present
+  const resumeText =
+    submission.candidate.resumeText ??
+    (submission.candidate as { summary?: string | null }).summary ??
+    null;
 
   // Extract job description
   const jobDescription = submission.requisition.jobDescription || null;

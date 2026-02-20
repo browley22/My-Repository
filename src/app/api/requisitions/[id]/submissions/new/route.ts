@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
+import { evaluateSubmission } from "@/lib/evaluateSubmission";
+import { createEventPayload } from "@/lib/create-event";
 
 const prisma = new PrismaClient();
 
 export const runtime = "nodejs";
 
-/** AGENCY-only: create a new candidate and submission for the requisition. */
+/** AGENCY-only: create a new candidate and submission for the requisition. Auto-evaluates fit and persists results. */
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -30,7 +32,7 @@ export async function POST(
 
   const requisition = await prisma.requisition.findUnique({
     where: { id: requisitionId },
-    select: { id: true },
+    select: { id: true, jobDescription: true },
   });
   if (!requisition) {
     return NextResponse.json(
@@ -77,8 +79,42 @@ export async function POST(
       },
     });
 
+    // Auto-evaluate: at create time candidate has no resume yet; use jobDescription from requisition
+    let evaluationQueued = true;
+    try {
+      const jobDescription = requisition.jobDescription ?? null;
+      const evaluation = evaluateSubmission({
+        resumeText: "",
+        jobDescription: jobDescription || undefined,
+        recruiterNotes: "",
+      });
+      await prisma.submission.update({
+        where: { id: submission.id },
+        data: {
+          fitScore: evaluation.fitScore,
+          fitSummary: evaluation.fitSummary,
+          strengths: evaluation.strengths,
+          gaps: evaluation.gaps,
+          sellingPoints: evaluation.sellingPoints,
+          objectionsAndRebuttals: evaluation.objectionsAndRebuttals,
+          confidence: evaluation.confidence,
+          evaluatedAt: new Date(),
+          events: {
+            create: createEventPayload({
+              type: "AI_EVALUATION",
+              note: `Fit ${evaluation.fitScore}%`,
+              actorRole: "AGENCY",
+            }),
+          },
+        },
+      });
+      evaluationQueued = false;
+    } catch (evalErr) {
+      console.error("Auto-evaluate after submission create:", evalErr);
+    }
+
     return NextResponse.json(
-      { candidateId: candidate.id, submissionId: submission.id },
+      { candidateId: candidate.id, submissionId: submission.id, evaluationQueued },
       { status: 200 }
     );
   } catch (err) {
