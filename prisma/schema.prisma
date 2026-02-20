@@ -61,14 +61,15 @@ model User {
 }
 
 model Requisition {
-  id             String        @id @default(cuid())
-  clientId       String
-  client         Client        @relation(fields: [clientId], references: [id])
-  title          String
-  location       String?
-  jobDescription String?
-  submissions    Submission[]
-  createdAt      DateTime     @default(now())
+  id                      String        @id @default(cuid())
+  clientId                String
+  client                  Client        @relation(fields: [clientId], references: [id])
+  title                   String
+  location                String?
+  jobDescription          String?
+  jobDescriptionUpdatedAt DateTime?
+  submissions             Submission[]
+  createdAt               DateTime      @default(now())
 }
 
 model Candidate {

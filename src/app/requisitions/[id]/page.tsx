@@ -89,7 +89,11 @@ const columns = [
 return (
 <div style={{ padding: 40 }}>
   <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-    <JobDescriptionModal title={requisition.title} jobDescription={requisition.jobDescription || null} />
+    <JobDescriptionModal
+    title={requisition.title}
+    requisitionId={requisition.id}
+    jobDescription={requisition.jobDescription || null}
+  />
     <span style={{ fontSize: 12, color: "#64748b" }}>View JD</span>
   </div>
   <p style={{ marginTop: 0, marginBottom: 16 }}>Client: {requisition.client.name}</p>
