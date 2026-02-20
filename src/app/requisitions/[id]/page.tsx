@@ -6,6 +6,7 @@ import RequisitionBoardClient from "@/components/RequisitionBoardClient";
 import { assertCanAccessSubmission, assertCanAccessRequisition } from "@/lib/submission-auth";
 import { createEventPayload } from "@/lib/create-event";
 import { ensureSubmissionOwnerIfNone } from "@/lib/submission-owner";
+import JobDescriptionModal from "@/components/JobDescriptionModal";
 
 const prisma = new PrismaClient();
 
@@ -86,7 +87,12 @@ const columns = [
 ] as const;
 
 return (
-<div style={{ padding: 40 }}> <h1>{requisition.title}</h1> <p>Client: {requisition.client.name}</p>
+<div style={{ padding: 40 }}>
+  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+    <JobDescriptionModal title={requisition.title} jobDescription={requisition.jobDescription || null} />
+    <span style={{ fontSize: 12, color: "#64748b" }}>View JD</span>
+  </div>
+  <p style={{ marginTop: 0, marginBottom: 16 }}>Client: {requisition.client.name}</p>
 
   <hr />
 

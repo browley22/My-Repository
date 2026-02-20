@@ -18,7 +18,21 @@ export default async function Home() {
 
   const requisitions = await prisma.requisition.findMany({
     include: { client: true },
+    orderBy: [
+      { client: { name: "asc" } },
+      { title: "asc" },
+    ],
   });
+
+  // Group requisitions by company
+  const requisitionsByCompany = requisitions.reduce((acc, req) => {
+    const companyName = req.client.name;
+    if (!acc[companyName]) {
+      acc[companyName] = [];
+    }
+    acc[companyName].push(req);
+    return acc;
+  }, {} as Record<string, typeof requisitions>);
 
   return (
     <div style={{ padding: 40 }}>
@@ -30,15 +44,20 @@ export default async function Home() {
 
       <h2>Requisitions</h2>
 
-      <ul>
-        {requisitions.map((req) => (
-          <li key={req.id}>
-            <a href={`/requisitions/${req.id}`}>
-              <strong>{req.title}</strong> — {req.client.name}
-            </a>
-          </li>
-        ))}
-      </ul>
+      {Object.entries(requisitionsByCompany).map(([companyName, companyRequisitions]) => (
+        <div key={companyName} style={{ marginBottom: 24 }}>
+          <h3 style={{ marginBottom: 8, fontSize: 18, fontWeight: 600 }}>{companyName}</h3>
+          <ul style={{ marginLeft: 20, marginTop: 0 }}>
+            {companyRequisitions.map((req) => (
+              <li key={req.id} style={{ marginBottom: 4 }}>
+                <a href={`/requisitions/${req.id}`} style={{ textDecoration: "none", color: "#0369a1" }}>
+                  {req.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
 
       <br />
       <a href="/api/auth/signout">Sign Out</a>
