@@ -46,41 +46,64 @@ function updatedResponse(requisition: { id: string; jobDescription: string | nul
 /** PUT: update job description from JSON body { jobDescription: string } */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const params = await Promise.resolve(context.params);
   const requisitionId = params?.id;
+
+  console.log("[job-description] PUT", { requisitionId, hasParams: !!params });
+
+  const session = await getServerSession(authOptions);
+  console.log("[job-description] session", { hasSession: !!session, hasUser: !!session?.user });
+
   if (!requisitionId) {
     return NextResponse.json({ error: "Missing requisition id" }, { status: 400 });
   }
   const access = await ensureAccess(session, requisitionId);
-  if ("error" in access) return access.error;
+  if ("error" in access) {
+    console.log("[job-description] access denied");
+    return access.error;
+  }
 
   let body: { jobDescription?: string };
   try {
     body = await request.json();
-  } catch {
+    console.log("[job-description] body parsed", { hasJobDescription: typeof body?.jobDescription === "string" });
+  } catch (e) {
+    console.error("[job-description] body parse failed", e);
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   const jobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
-  const updated = await prisma.requisition.update({
-    where: { id: requisitionId },
-    data: {
-      jobDescription: jobDescription || null,
-      jobDescriptionUpdatedAt: new Date(),
-    },
-    select: { id: true, jobDescription: true, jobDescriptionUpdatedAt: true },
-  });
-  return updatedResponse(updated);
+
+  try {
+    const updated = await prisma.requisition.update({
+      where: { id: requisitionId },
+      data: {
+        jobDescription: jobDescription || null,
+        jobDescriptionUpdatedAt: new Date(),
+      },
+      select: { id: true, jobDescription: true, jobDescriptionUpdatedAt: true },
+    });
+    console.log("[job-description] Prisma update success", { id: updated.id });
+    return updatedResponse(updated);
+  } catch (e) {
+    console.error("[job-description] Prisma update failed", e);
+    return NextResponse.json(
+      { error: "Failed to update job description", details: e instanceof Error ? e.message : String(e) },
+      { status: 500 }
+    );
+  }
 }
 
 /** POST: multipart/form-data with a text file; extract text and save as job description */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const session = await getServerSession(authOptions);
+  const params = await Promise.resolve(context.params);
   const requisitionId = params?.id;
+  console.log("[job-description] POST", { requisitionId });
+  const session = await getServerSession(authOptions);
   if (!requisitionId) {
     return NextResponse.json({ error: "Missing requisition id" }, { status: 400 });
   }
@@ -113,13 +136,22 @@ export async function POST(
     return NextResponse.json({ error: "Failed to read file as text" }, { status: 400 });
   }
   const jobDescription = text.trim() || null;
-  const updated = await prisma.requisition.update({
-    where: { id: requisitionId },
-    data: {
-      jobDescription,
-      jobDescriptionUpdatedAt: new Date(),
-    },
-    select: { id: true, jobDescription: true, jobDescriptionUpdatedAt: true },
-  });
-  return updatedResponse(updated);
+  try {
+    const updated = await prisma.requisition.update({
+      where: { id: requisitionId },
+      data: {
+        jobDescription,
+        jobDescriptionUpdatedAt: new Date(),
+      },
+      select: { id: true, jobDescription: true, jobDescriptionUpdatedAt: true },
+    });
+    console.log("[job-description] POST Prisma update success", { id: updated.id });
+    return updatedResponse(updated);
+  } catch (e) {
+    console.error("[job-description] POST Prisma update failed", e);
+    return NextResponse.json(
+      { error: "Failed to update job description", details: e instanceof Error ? e.message : String(e) },
+      { status: 500 }
+    );
+  }
 }

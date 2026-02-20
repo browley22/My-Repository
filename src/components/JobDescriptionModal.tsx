@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 
 /** Read a File as text via FileReader; returns a promise that resolves with the text. */
 export function readFileAsText(file: File): Promise<string> {
@@ -33,6 +34,7 @@ export default function JobDescriptionModal({
   const [saving, setSaving] = React.useState(false);
   const [saveMessage, setSaveMessage] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   React.useEffect(() => {
     setMounted(true);
@@ -84,27 +86,29 @@ export default function JobDescriptionModal({
   const saveJd = React.useCallback(async () => {
     setSaving(true);
     setSaveMessage(null);
+    const url = `/api/requisitions/${requisitionId}/job-description`;
     try {
-      const res = await fetch(`/api/requisitions/${requisitionId}/job-description`, {
+      const res = await fetch(url, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobDescription: textareaValue }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setSaveMessage(data.error || "Failed to save");
+        const msg = data.error || data.details || "Failed to save";
+        setSaveMessage(msg);
         return;
       }
-      const data = await res.json();
       setJobDescription(data.jobDescription ?? null);
       setEditMode(false);
       setSaveMessage("JD saved");
       setDroppedFileName(null);
       setTimeout(() => setSaveMessage(null), 3000);
+      router.refresh();
     } finally {
       setSaving(false);
     }
-  }, [requisitionId, textareaValue]);
+  }, [requisitionId, textareaValue, router]);
 
   const showEmptyState = !jobDescription && editMode;
   const showReadOnly = jobDescription && !editMode;
