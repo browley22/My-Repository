@@ -497,7 +497,7 @@ export default function CandidateDetailSheet({
 
         {activeTab !== "RESUME" && (role !== "CLIENT" || activeTab !== "YOUR_DECISION") && (
         <div className="space-y-6 p-4">
-          {/* Actions - AGENCY only. For CLIENT: no "Your Decision" section in this panel; decisions only in Your Decision tab. */}
+          {/* Actions - AGENCY only */}
           {role !== "CLIENT" && (
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Actions</h3>
