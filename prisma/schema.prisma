@@ -66,8 +66,8 @@ model Requisition {
   client                  Client        @relation(fields: [clientId], references: [id])
   title                   String
   location                String?
-  jobDescription          String?
-  jobDescriptionUpdatedAt DateTime?
+  jobDescription          String?       // long text JD content
+  jobDescriptionUpdatedAt DateTime?     // optional, used by JD API
   submissions             Submission[]
   createdAt               DateTime      @default(now())
 }
