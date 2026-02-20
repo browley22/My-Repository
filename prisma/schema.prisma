@@ -73,18 +73,19 @@ model Requisition {
 }
 
 model Candidate {
-  id           String        @id @default(cuid())
-  firstName    String
-  lastName     String
-  title        String?
-  location     String?
-  yearsExp     Int?
-  rate         String?
-  availability String?
-  resumeUrl    String?       // optional
-  resumeText   String?       // long text for in-app preview (e.g. extracted from docx)
-  submissions  Submission[]
-  createdAt    DateTime     @default(now())
+  id                   String        @id @default(cuid())
+  firstName            String
+  lastName             String
+  title                String?
+  location             String?
+  yearsExp             Int?
+  rate                 String?
+  availability         String?
+  resumeUrl            String?       // optional
+  resumeText           String?      // extracted at upload for in-app preview
+  resumeTextUpdatedAt  DateTime?    // when resumeText was last set
+  submissions          Submission[]
+  createdAt            DateTime      @default(now())
 }
 
 model Submission {

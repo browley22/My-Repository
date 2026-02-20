@@ -86,7 +86,7 @@ export async function POST(
   try {
     await prisma.candidate.update({
       where: { id: candidateId },
-      data: { resumeText: text.length > 0 ? text : null },
+      data: { resumeText: text.length > 0 ? text : null, resumeTextUpdatedAt: new Date() },
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

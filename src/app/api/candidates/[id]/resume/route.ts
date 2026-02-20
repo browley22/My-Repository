@@ -142,7 +142,7 @@ export async function POST(
         resumeText = text;
         await prisma.candidate.update({
           where: { id: candidateId },
-          data: { resumeText },
+          data: { resumeText, resumeTextUpdatedAt: new Date() },
         });
       }
     } catch (err) {

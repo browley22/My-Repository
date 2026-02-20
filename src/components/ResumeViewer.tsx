@@ -156,32 +156,27 @@ export default function ResumeViewer({
   } else if (resumeUrl) {
     content = (
       <>
-        <p style={{ fontSize: 14, color: "#6b7280" }}>
-          {canGeneratePreview ? "Generate a text preview from the .docx file to view it here." : "Preview not available for this file type yet."}
-        </p>
+        <p style={{ fontSize: 14, color: "#6b7280" }}>Preview not available for this file type yet.</p>
         {canGeneratePreview && (
-          <div style={{ marginTop: 12 }}>
+          <p style={{ marginTop: 8, fontSize: 13 }}>
             <button
               type="button"
               onClick={handleGeneratePreview}
               disabled={extractLoading}
               style={{
-                padding: "10px 20px",
-                fontSize: 14,
-                fontWeight: 600,
+                background: "none",
                 border: "none",
-                borderRadius: 6,
-                background: extractLoading ? "#9ca3af" : "#111827",
-                color: "#fff",
+                padding: 0,
                 cursor: extractLoading ? "not-allowed" : "pointer",
+                color: "#2563eb",
+                textDecoration: "underline",
+                fontSize: 13,
               }}
             >
-              {extractLoading ? "Generating…" : "Generate Preview"}
+              {extractLoading ? "Extracting…" : "Extract text (for old uploads)"}
             </button>
-            {extractError && (
-              <p style={{ marginTop: 8, fontSize: 13, color: "#dc2626" }}>{extractError}</p>
-            )}
-          </div>
+            {extractError && <span style={{ marginLeft: 8, color: "#dc2626" }}>{extractError}</span>}
+          </p>
         )}
         <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
           <a href={resumeUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, color: "#2563eb", textDecoration: "underline" }}>
