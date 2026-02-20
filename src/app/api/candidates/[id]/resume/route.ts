@@ -83,8 +83,9 @@ export async function POST(
     await mkdir(dir, { recursive: true });
   } catch (err) {
     console.error("Resume upload mkdir:", err);
+    const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Failed to create upload directory" },
+      { error: "Failed to create upload directory", detail: msg },
       { status: 500 }
     );
   }
@@ -96,25 +97,14 @@ export async function POST(
     await writeFile(filePath, buffer);
   } catch (err) {
     console.error("Resume upload writeFile:", err);
+    const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Failed to save file" },
+      { error: "Failed to save file", detail: msg },
       { status: 500 }
     );
   }
 
   const resumeUrl = `/uploads/resumes/${safeName}`;
-
-  let resumeText: string | null = null;
-  const isDocx = ext === ".docx" || ext === ".doc" || type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || type === "application/msword";
-  if (isDocx) {
-    try {
-      const result = await mammoth.extractRawText({ buffer });
-      const text = (result?.value ?? "").trim();
-      resumeText = text.length > 0 ? text : null;
-    } catch (err) {
-      console.warn("Resume DOCX text extraction failed:", err);
-    }
-  }
 
   const existing = await prisma.candidate.findUnique({
     where: { id: candidateId },
@@ -122,7 +112,7 @@ export async function POST(
   });
   if (!existing) {
     return NextResponse.json(
-      { error: "Candidate not found for id", candidateId },
+      { error: "Candidate not found", detail: candidateId },
       { status: 404 }
     );
   }
@@ -130,19 +120,39 @@ export async function POST(
   try {
     await prisma.candidate.update({
       where: { id: candidateId },
-      data: { resumeUrl, resumeText },
+      data: { resumeUrl },
     });
   } catch (err: unknown) {
     const message = err && typeof err === "object" && "message" in err ? String((err as { message?: unknown }).message) : String(err);
     console.error("Candidate update failed", err);
     return NextResponse.json(
-      { error: "Candidate update failed", candidateId, detail: message },
+      { error: "Candidate update failed", detail: message },
       { status: 500 }
     );
   }
 
+  let resumeText: string | null = null;
+  let warning: string | undefined;
+  const isDocx = ext === ".docx" || ext === ".doc" || type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || type === "application/msword";
+  if (isDocx) {
+    try {
+      const result = await mammoth.extractRawText({ buffer });
+      const text = (result?.value ?? "").trim();
+      if (text.length > 0) {
+        resumeText = text;
+        await prisma.candidate.update({
+          where: { id: candidateId },
+          data: { resumeText },
+        });
+      }
+    } catch (err) {
+      console.warn("Resume DOCX text extraction failed (upload succeeded):", err);
+      warning = "Text extraction failed; file saved. Preview may be unavailable.";
+    }
+  }
+
   const payload: { resumeUrl: string; resumeText?: string | null; warning?: string } = { resumeUrl };
   if (resumeText != null) payload.resumeText = resumeText;
-  if (isDocx && resumeText == null) payload.warning = "Text extraction failed; file saved. Preview may be unavailable.";
+  if (warning) payload.warning = warning;
   return NextResponse.json(payload, { status: 200 });
 }

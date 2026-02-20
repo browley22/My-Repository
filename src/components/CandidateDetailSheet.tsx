@@ -189,10 +189,17 @@ export default function CandidateDetailSheet({
           method: "POST",
           body: form,
         });
-        const data = await res.json().catch(() => ({}));
+        const raw = await res.text();
+        let data: { error?: string; detail?: string; resumeUrl?: string; warning?: string } = {};
+        try {
+          data = raw ? JSON.parse(raw) : {};
+        } catch {
+          data = {};
+        }
         if (!res.ok) {
-          const errMsg = typeof data?.error === "string" ? data.error : "Upload failed";
-          const withDetail = typeof data?.detail === "string" ? `${errMsg} — ${data.detail}` : errMsg;
+          const errMsg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
+          const detail = typeof data?.detail === "string" ? data.detail : raw || res.statusText;
+          const withDetail = detail ? `${errMsg} — ${detail}` : errMsg;
           setResumeError(withDetail);
           setLastUploadStatus("Upload failed: " + withDetail);
           return;
