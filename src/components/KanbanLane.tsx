@@ -44,6 +44,14 @@ type Props = {
   role?: "CLIENT" | "AGENCY";
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  /** CLIENT only: decision actions for card dropdown */
+  onMarkInterested?: (submissionId: string) => void | Promise<void>;
+  onNeedInfo?: (submissionId: string) => void | Promise<void>;
+  onRequestInterview?: (submissionId: string) => void | Promise<void>;
+  onMakeOffer?: (submissionId: string) => void | Promise<void>;
+  onOfferDeclined?: (submissionId: string) => void | Promise<void>;
+  onMarkPass?: (submissionId: string) => void | Promise<void>;
+  onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
 };
 
 const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
@@ -59,10 +67,13 @@ const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" |
 
 const CLIENT_DECISION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
   { value: "—", label: "—", category: "internal" },
-  { value: "Needs your decision", label: "Needs your decision", category: "waiting" },
-  { value: "Review update", label: "Review update", category: "client" },
-  { value: "Schedule interview", label: "Schedule interview", category: "candidate" },
-  { value: "Review offer", label: "Review offer", category: "client" },
+  { value: "Interested", label: "Interested", category: "done" },
+  { value: "Need Info", label: "Need Info", category: "client" },
+  { value: "Request Interview", label: "Request Interview", category: "candidate" },
+  { value: "Make Offer", label: "Make Offer", category: "done" },
+  { value: "Offer Declined", label: "Offer Declined", category: "client" },
+  { value: "Pass", label: "Pass", category: "done" },
+  { value: "Feedback", label: "Feedback", category: "client" },
 ];
 const NEXT_ACTION_STYLES: Record<string, { bg: string; text: string }> = {
   waiting: { bg: "#fef9c3", text: "#854d0e" },
@@ -110,12 +121,26 @@ function DraggableCard({
   role,
   isSelected,
   onToggleSelect,
+  onMarkInterested,
+  onNeedInfo,
+  onRequestInterview,
+  onMakeOffer,
+  onOfferDeclined,
+  onMarkPass,
+  onAddFeedback,
 }: {
   submission: Submission;
   onClick?: (e: React.MouseEvent<HTMLElement>, submission: Submission) => void;
   role?: "CLIENT" | "AGENCY";
   isSelected?: boolean;
   onToggleSelect?: (id: string) => void;
+  onMarkInterested?: (submissionId: string) => void | Promise<void>;
+  onNeedInfo?: (submissionId: string) => void | Promise<void>;
+  onRequestInterview?: (submissionId: string) => void | Promise<void>;
+  onMakeOffer?: (submissionId: string) => void | Promise<void>;
+  onOfferDeclined?: (submissionId: string) => void | Promise<void>;
+  onMarkPass?: (submissionId: string) => void | Promise<void>;
+  onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -553,6 +578,22 @@ function DraggableCard({
             const style = NEXT_ACTION_STYLES[category] ?? NEXT_ACTION_STYLES.internal;
             const updatedAgo = days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`;
             const label = isClient ? "Your Decision" : "Next Action";
+            const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+              const v = e.target.value;
+              setNextActionOverride(v);
+              if (!isClient || v === "—") return;
+              const id = submission.id;
+              if (v === "Interested" && onMarkInterested) void onMarkInterested(id);
+              else if (v === "Need Info" && onNeedInfo) void onNeedInfo(id);
+              else if (v === "Request Interview" && onRequestInterview) void onRequestInterview(id);
+              else if (v === "Make Offer" && onMakeOffer) void onMakeOffer(id);
+              else if (v === "Offer Declined" && onOfferDeclined) void onOfferDeclined(id);
+              else if (v === "Pass" && onMarkPass) void onMarkPass(id);
+              else if (v === "Feedback" && onAddFeedback) {
+                const note = typeof window !== "undefined" ? window.prompt("Add feedback for agency:") : null;
+                if (note != null && note.trim()) void onAddFeedback(id, note.trim());
+              }
+            };
             return (
               <div
                 style={{ marginTop: 6 }}
@@ -571,7 +612,7 @@ function DraggableCard({
                   <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginBottom: 2 }}>{label}</div>
                   <select
                     value={optionsList.some((o) => o.value === displayAction) ? displayAction : "—"}
-                    onChange={(e) => setNextActionOverride(e.target.value)}
+                    onChange={handleSelectChange}
                     style={{
                       fontSize: 11,
                       fontWeight: 500,
@@ -683,6 +724,13 @@ function DroppableColumn({
   role,
   selectedIds,
   onToggleSelect,
+  onMarkInterested,
+  onNeedInfo,
+  onRequestInterview,
+  onMakeOffer,
+  onOfferDeclined,
+  onMarkPass,
+  onAddFeedback,
 }: {
   status: string;
   submissions: Submission[];
@@ -690,6 +738,13 @@ function DroppableColumn({
   role?: "CLIENT" | "AGENCY";
   selectedIds?: Set<string>;
   onToggleSelect?: (id: string) => void;
+  onMarkInterested?: (submissionId: string) => void | Promise<void>;
+  onNeedInfo?: (submissionId: string) => void | Promise<void>;
+  onRequestInterview?: (submissionId: string) => void | Promise<void>;
+  onMakeOffer?: (submissionId: string) => void | Promise<void>;
+  onOfferDeclined?: (submissionId: string) => void | Promise<void>;
+  onMarkPass?: (submissionId: string) => void | Promise<void>;
+  onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -724,6 +779,13 @@ function DroppableColumn({
           role={role}
           isSelected={selectedIds?.has(sub.id)}
           onToggleSelect={onToggleSelect}
+          onMarkInterested={onMarkInterested}
+          onNeedInfo={onNeedInfo}
+          onRequestInterview={onRequestInterview}
+          onMakeOffer={onMakeOffer}
+          onOfferDeclined={onOfferDeclined}
+          onMarkPass={onMarkPass}
+          onAddFeedback={onAddFeedback}
         />
       ))}
     </div>
@@ -739,6 +801,13 @@ export default function KanbanLane({
   role,
   selectedIds,
   onToggleSelect,
+  onMarkInterested,
+  onNeedInfo,
+  onRequestInterview,
+  onMakeOffer,
+  onOfferDeclined,
+  onMarkPass,
+  onAddFeedback,
 }: Props) {
   const [sortMode, setSortMode] = React.useState<"OLDEST" | "NEWEST" | "PRIORITY">("OLDEST");
   const [staleOnly, setStaleOnly] = React.useState(false);
@@ -991,6 +1060,13 @@ export default function KanbanLane({
                 return sortMode === "OLDEST" ? aTime - bTime : bTime - aTime;
               })}
             onCardClick={onCardClick}
+            onMarkInterested={onMarkInterested}
+            onNeedInfo={onNeedInfo}
+            onRequestInterview={onRequestInterview}
+            onMakeOffer={onMakeOffer}
+            onOfferDeclined={onOfferDeclined}
+            onMarkPass={onMarkPass}
+            onAddFeedback={onAddFeedback}
           />
         ))}
       </div>

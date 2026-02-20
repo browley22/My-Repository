@@ -2320,6 +2320,13 @@ export default function RequisitionBoardClient({
           role={role}
           selectedIds={role === "AGENCY" ? selectedSubmissionIds : undefined}
           onToggleSelect={role === "AGENCY" ? (id) => setSelectedSubmissionIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }) : undefined}
+          onMarkInterested={role === "CLIENT" ? onMarkInterested : undefined}
+          onNeedInfo={role === "CLIENT" ? onNeedInfo : undefined}
+          onRequestInterview={role === "CLIENT" ? onRequestInterview : undefined}
+          onMakeOffer={role === "CLIENT" ? onMakeOffer : undefined}
+          onOfferDeclined={role === "CLIENT" ? onOfferDeclined : undefined}
+          onMarkPass={role === "CLIENT" ? onMarkPass : undefined}
+          onAddFeedback={role === "CLIENT" ? onAddFeedback : undefined}
         />
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>

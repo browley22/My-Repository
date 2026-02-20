@@ -253,6 +253,11 @@ export default function CandidateDetailSheet({
     if (open) { setNote(""); setOwnerInput(""); }
   }, [open, submission?.id]);
 
+  // CLIENT: no "Your Decision" tab in popover; decisions live on card dropdown. Avoid broken state if activeTab is YOUR_DECISION.
+  React.useEffect(() => {
+    if (role === "CLIENT" && activeTab === "YOUR_DECISION") setActiveTab("WRITEUP");
+  }, [role, activeTab]);
+
   const isResumeTabActive = activeTab === "RESUME" && role === "AGENCY";
   React.useEffect(() => {
     if (!isResumeTabActive || role !== "AGENCY") return;
@@ -417,33 +422,20 @@ export default function CandidateDetailSheet({
           </div>
         </div>
 
-        {/* Tabs - CLIENT: Your Decision, Write-up, Resume; AGENCY: Resume only */}
+        {/* Tabs - CLIENT: Write-up, Resume (decisions on card dropdown). AGENCY: Resume only */}
         <div className="border-b px-4 pt-2 flex gap-2 text-sm">
           {role === "CLIENT" && (
-            <>
-              <button
-                type="button"
-                className={`px-3 py-1 rounded-t-md border-b-2 ${
-                  activeTab === "YOUR_DECISION"
-                    ? "border-sky-500 text-sky-700 font-semibold"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("YOUR_DECISION")}
-              >
-                Your Decision
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1 rounded-t-md border-b-2 ${
-                  activeTab === "WRITEUP"
-                    ? "border-sky-500 text-sky-700 font-semibold"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-                onClick={() => setActiveTab("WRITEUP")}
-              >
-                Write-up
-              </button>
-            </>
+            <button
+              type="button"
+              className={`px-3 py-1 rounded-t-md border-b-2 ${
+                activeTab === "WRITEUP"
+                  ? "border-sky-500 text-sky-700 font-semibold"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+              onClick={() => setActiveTab("WRITEUP")}
+            >
+              Write-up
+            </button>
           )}
           <button
             type="button"
@@ -457,42 +449,6 @@ export default function CandidateDetailSheet({
             Resume
           </button>
         </div>
-
-        {role === "CLIENT" && activeTab === "YOUR_DECISION" && (
-        <div className="space-y-4 p-4">
-          <div className="grid grid-cols-1 gap-2">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Positive</div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="rounded-md border border-green-600 bg-green-50 px-3 py-2 text-sm text-green-800 hover:bg-green-100 disabled:opacity-50" disabled={busy !== null} onClick={async () => { setBusy("feedback"); await onMarkInterested(submission.id); setBusy(null); }}>Interested</button>
-              <button type="button" className="rounded-md border border-green-600 bg-green-50 px-3 py-2 text-sm text-green-800 hover:bg-green-100 disabled:opacity-50" disabled={busy !== null} onClick={async () => { setBusy("interview"); await onRequestInterview(submission.id); setBusy(null); }}>Request Interview</button>
-              <button type="button" className="rounded-md border border-green-600 bg-green-50 px-3 py-2 text-sm text-green-800 hover:bg-green-100 disabled:opacity-50" disabled={busy !== null} onClick={async () => { setBusy("interview"); await onMakeOffer(submission.id); setBusy(null); }}>Make Offer</button>
-            </div>
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mt-2">Neutral</div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" disabled={busy !== null} onClick={async () => { setBusy("feedback"); await onNeedInfo(submission.id); setBusy(null); }}>Need Info</button>
-              <button type="button" className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50" disabled={busy !== null} onClick={() => setFeedbackModalOpen(true)}>Feedback</button>
-            </div>
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mt-2">Negative</div>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 hover:bg-red-100 disabled:opacity-50" disabled={busy !== null} onClick={async () => { setBusy("feedback"); await onMarkPass(submission.id); setBusy(null); }}>Pass</button>
-              <button type="button" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 hover:bg-red-100 disabled:opacity-50" disabled={busy !== null} onClick={async () => { setBusy("interview"); await onOfferDeclined(submission.id); setBusy(null); }}>Offer Declined</button>
-            </div>
-          </div>
-          {feedbackSuccess && <p className="text-sm text-green-600 mt-2">Feedback sent.</p>}
-          {feedbackModalOpen && (
-            <div className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/40" onClick={() => !busy && setFeedbackModalOpen(false)}>
-              <div className="bg-white rounded-lg border border-gray-200 shadow-lg p-4 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
-                <h4 className="text-sm font-semibold text-gray-800 mb-2">Send feedback to agency</h4>
-                <textarea className="w-full rounded-md border border-gray-300 p-3 text-sm box-border min-h-[120px]" placeholder="Share thoughts, questions, or concerns…" value={feedbackModalText} onChange={(e) => setFeedbackModalText(e.target.value)} />
-                <div className="flex gap-2 mt-3">
-                  <button type="button" className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50" onClick={() => { setFeedbackModalOpen(false); setFeedbackModalText(""); }}>Cancel</button>
-                  <button type="button" className="rounded-md bg-sky-600 text-white px-3 py-2 text-sm hover:bg-sky-700 disabled:opacity-50" disabled={busy !== null || !feedbackModalText.trim()} onClick={async () => { setBusy("feedback"); await onAddFeedback(submission.id, feedbackModalText.trim()); setFeedbackModalText(""); setFeedbackModalOpen(false); setFeedbackSuccess(true); setBusy(null); router.refresh(); setTimeout(() => setFeedbackSuccess(false), 3000); }}>Send</button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        )}
 
         {activeTab !== "RESUME" && (role !== "CLIENT" || activeTab !== "YOUR_DECISION") && (
         <div className="space-y-6 p-4">
