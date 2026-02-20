@@ -504,23 +504,8 @@ function DraggableCard({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ fontWeight: 600 }}>
-              {fullName}{rank != null ? ` #${rank}` : ""}
+              {fullName} — AI Ranking #{rank ?? "—"}
             </div>
-            {submission.fitScore !== null && submission.fitScore !== undefined && (
-              <div
-                style={{
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  background: submission.fitScore >= 80 ? "#dcfce7" : submission.fitScore >= 60 ? "#dbeafe" : "#fef3c7",
-                  color: submission.fitScore >= 80 ? "#166534" : submission.fitScore >= 60 ? "#1e40af" : "#92400e",
-                  border: `1px solid ${submission.fitScore >= 80 ? "#86efac" : submission.fitScore >= 60 ? "#93c5fd" : "#fde68a"}`,
-                }}
-              >
-                Fit {submission.fitScore}
-              </div>
-            )}
           </div>
           {submission.candidate.title && (
   <div style={{ fontSize: 12, color: "#6b7280" }}>
@@ -586,14 +571,9 @@ function DraggableCard({
   </div>
 )}
 
-          <div style={{ fontSize: 11, color: "#c4c4c4", marginTop: 2 }}>
-            Last updated: {lastUpdatedText}
+          <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+            Updated {days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`}
           </div>
-          {stageAgingText && (
-            <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, fontStyle: "italic" }}>
-              In this stage: {stageAgingText}
-            </div>
-          )}
           {(() => {
             const isClient = role === "CLIENT";
             const optionsList = isClient ? CLIENT_DECISION_OPTIONS : NEXT_ACTION_OPTIONS;
@@ -657,28 +637,10 @@ function DraggableCard({
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
-                  <div style={{ fontSize: 9, opacity: 0.85, marginTop: 2 }}>updated {updatedAgo}</div>
                 </div>
               </div>
             );
           })()}
-          {latestDecision && (
-            <div
-              style={{
-                fontSize: 10,
-                color: latestDecision === "Interested" ? "#16a34a" : latestDecision === "Pass" ? "#dc2626" : "#f59e0b",
-                marginTop: 4,
-                fontWeight: 500,
-              }}
-            >
-              {latestDecision}
-            </div>
-          )}
-          {isStale && (
-            <div style={{ fontSize: 11, color: "#f59e0b", marginTop: 4, fontStyle: "italic" }}>
-              Follow up needed
-            </div>
-          )}
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
