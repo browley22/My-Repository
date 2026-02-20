@@ -1,95 +1,74 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "../../../../auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
 import { assertCanAccessRequisition } from "@/lib/submission-auth";
-import type { Session } from "next-auth";
 
 const prisma = new PrismaClient();
 
 export const runtime = "nodejs";
 
-type AccessResult =
-  | { error: NextResponse }
-  | { requisition: { id: string; clientId: string } };
+/** PUT: update job description from JSON body { jobDescription: string } */
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  const id = params?.id;
+  const session = await getServerSession(authOptions);
 
-async function ensureAccess(
-  session: Session | null,
-  requisitionId: string
-): Promise<AccessResult> {
+  console.log("[JD PUT] id=", id, "session=", !!session);
+
   if (!session?.user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (!id) {
+    return NextResponse.json({ error: "Missing requisition id" }, { status: 400 });
+  }
+
   const requisition = await prisma.requisition.findUnique({
-    where: { id: requisitionId },
+    where: { id },
     select: { id: true, clientId: true },
   });
   if (!requisition) {
-    return { error: NextResponse.json({ error: "Requisition not found" }, { status: 404 }) };
+    return NextResponse.json({ error: "Requisition not found" }, { status: 404 });
   }
   try {
     assertCanAccessRequisition(session, requisition.clientId);
   } catch {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
-  }
-  return { requisition };
-}
-
-function updatedResponse(requisition: { id: string; jobDescription: string | null; jobDescriptionUpdatedAt: Date | null }) {
-  return NextResponse.json({
-    id: requisition.id,
-    jobDescription: requisition.jobDescription,
-    jobDescriptionUpdatedAt: requisition.jobDescriptionUpdatedAt?.toISOString() ?? null,
-  });
-}
-
-/** PUT: update job description from JSON body { jobDescription: string } */
-export async function PUT(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
-) {
-  const params = await Promise.resolve(context.params);
-  const requisitionId = params?.id;
-
-  console.log("[job-description] PUT", { requisitionId, hasParams: !!params });
-
-  const session = await getServerSession(authOptions);
-  console.log("[job-description] session", { hasSession: !!session, hasUser: !!session?.user });
-
-  if (!requisitionId) {
-    return NextResponse.json({ error: "Missing requisition id" }, { status: 400 });
-  }
-  const access = await ensureAccess(session, requisitionId);
-  if ("error" in access) {
-    console.log("[job-description] access denied");
-    return access.error;
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let body: { jobDescription?: string };
+  let body: { jobDescription?: unknown };
   try {
-    body = await request.json();
-    console.log("[job-description] body parsed", { hasJobDescription: typeof body?.jobDescription === "string" });
+    body = await req.json();
   } catch (e) {
-    console.error("[job-description] body parse failed", e);
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    console.error("[JD PUT] body parse failed", e);
+    return NextResponse.json({ error: "Invalid JSON body", detail: String(e) }, { status: 400 });
   }
-  const jobDescription = typeof body.jobDescription === "string" ? body.jobDescription : "";
+  const jobDescription =
+    typeof body.jobDescription === "string" ? body.jobDescription.trim() : "";
+  console.log("[JD PUT] length=", jobDescription.length);
 
   try {
     const updated = await prisma.requisition.update({
-      where: { id: requisitionId },
+      where: { id },
       data: {
         jobDescription: jobDescription || null,
         jobDescriptionUpdatedAt: new Date(),
       },
-      select: { id: true, jobDescription: true, jobDescriptionUpdatedAt: true },
+      select: { id: true, jobDescription: true },
     });
-    console.log("[job-description] Prisma update success", { id: updated.id });
-    return updatedResponse(updated);
-  } catch (e) {
-    console.error("[job-description] Prisma update failed", e);
+    return NextResponse.json({
+      id: updated.id,
+      jobDescription: updated.jobDescription ?? null,
+    });
+  } catch (error) {
+    console.error("[JD PUT] error", error);
     return NextResponse.json(
-      { error: "Failed to update job description", details: e instanceof Error ? e.message : String(e) },
+      {
+        error: "Failed to update job description",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }
@@ -97,22 +76,32 @@ export async function PUT(
 
 /** POST: multipart/form-data with a text file; extract text and save as job description */
 export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> | { id: string } }
+  req: Request,
+  { params }: { params: { id: string } }
 ) {
-  const params = await Promise.resolve(context.params);
-  const requisitionId = params?.id;
-  console.log("[job-description] POST", { requisitionId });
+  const id = params?.id;
   const session = await getServerSession(authOptions);
-  if (!requisitionId) {
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!id) {
     return NextResponse.json({ error: "Missing requisition id" }, { status: 400 });
   }
-  const access = await ensureAccess(session, requisitionId);
-  if ("error" in access) return access.error;
-
+  const requisition = await prisma.requisition.findUnique({
+    where: { id },
+    select: { id: true, clientId: true },
+  });
+  if (!requisition) {
+    return NextResponse.json({ error: "Requisition not found" }, { status: 404 });
+  }
+  try {
+    assertCanAccessRequisition(session, requisition.clientId);
+  } catch {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   let formData: FormData;
   try {
-    formData = await request.formData();
+    formData = await req.formData();
   } catch {
     return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
   }
@@ -120,7 +109,7 @@ export async function POST(
   if (!file || typeof file === "string") {
     return NextResponse.json({ error: "Missing or invalid file" }, { status: 400 });
   }
-  const type = file.type?.toLowerCase() ?? "";
+  const type = (file as File).type?.toLowerCase() ?? "";
   const isText = type.startsWith("text/") || type === "application/octet-stream";
   if (!isText) {
     return NextResponse.json(
@@ -130,7 +119,7 @@ export async function POST(
   }
   let text: string;
   try {
-    const buf = await file.arrayBuffer();
+    const buf = await (file as File).arrayBuffer();
     text = new TextDecoder("utf-8").decode(buf);
   } catch {
     return NextResponse.json({ error: "Failed to read file as text" }, { status: 400 });
@@ -138,19 +127,24 @@ export async function POST(
   const jobDescription = text.trim() || null;
   try {
     const updated = await prisma.requisition.update({
-      where: { id: requisitionId },
+      where: { id },
       data: {
         jobDescription,
         jobDescriptionUpdatedAt: new Date(),
       },
-      select: { id: true, jobDescription: true, jobDescriptionUpdatedAt: true },
+      select: { id: true, jobDescription: true },
     });
-    console.log("[job-description] POST Prisma update success", { id: updated.id });
-    return updatedResponse(updated);
-  } catch (e) {
-    console.error("[job-description] POST Prisma update failed", e);
+    return NextResponse.json({
+      id: updated.id,
+      jobDescription: updated.jobDescription ?? null,
+    });
+  } catch (error) {
+    console.error("[JD POST] error", error);
     return NextResponse.json(
-      { error: "Failed to update job description", details: e instanceof Error ? e.message : String(e) },
+      {
+        error: "Failed to update job description",
+        detail: error instanceof Error ? error.message : String(error),
+      },
       { status: 500 }
     );
   }

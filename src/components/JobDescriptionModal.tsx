@@ -93,10 +93,13 @@ export default function JobDescriptionModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobDescription: textareaValue }),
       });
-      const data = await res.json().catch(() => ({}));
+      const raw = await res.text();
+      const data = raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
       if (!res.ok) {
-        const msg = data.error || data.details || "Failed to save";
-        setSaveMessage(msg);
+        console.error("[Save JD] failure", { status: res.status, url, body: raw });
+        const serverMsg = data.error || data.details || "Failed to save";
+        const detail = data.detail ? ` — ${data.detail}` : "";
+        setSaveMessage(`${serverMsg}${detail}`);
         return;
       }
       setJobDescription(data.jobDescription ?? null);
