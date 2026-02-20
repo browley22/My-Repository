@@ -95,6 +95,31 @@ function prettyStatus(s?: string | null) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Last activity time for aging: updatedAt, then lastUpdatedAt/lastMovedAt, then latest event createdAt. */
+function getLastActivityDate(submission: Submission): number {
+  const sub = submission as { updatedAt?: string | null; lastUpdatedAt?: string | null; lastMovedAt?: string | null };
+  if (sub.updatedAt) return new Date(sub.updatedAt).getTime();
+  if (sub.lastUpdatedAt) return new Date(sub.lastUpdatedAt).getTime();
+  if (sub.lastMovedAt) return new Date(sub.lastMovedAt).getTime();
+  if (submission.events?.length) {
+    const latest = submission.events
+      .slice()
+      .sort(
+        (a: any, b: any) =>
+          new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime()
+      )[0];
+    if (latest?.createdAt) return new Date(latest.createdAt).getTime();
+  }
+  return Date.now();
+}
+
+/** Aging bucket for card styling: under 8h green, 8–48h yellow, 48h+ red. */
+function getAgeBucket(ageHours: number): "fresh" | "aging" | "stale" {
+  if (ageHours < 8) return "fresh";
+  if (ageHours < 48) return "aging";
+  return "stale";
+}
+
 /** Priority score from existing signals: +2 stale, +2 client requested info, +1 recent client activity, +1 unassigned, +1 interview/offer stage. */
 function getSubmissionPriorityScore(submission: Submission): number {
   let score = 0;
@@ -223,15 +248,22 @@ function DraggableCard({
   else if (hours > 0) agingText = `${hours} hour${hours > 1 ? "s" : ""}`;
   else agingText = `${minutes} minute${minutes > 1 ? "s" : ""}`;
 
-  // Age thresholds: fresh < 4h, watch 4h–48h, stale >= 48h
+  // Aging for styling: <8h green, 8–48h yellow, ≥48h red (using last activity time)
+  const lastActivityMs = getLastActivityDate(submission);
+  const ageHours = (Date.now() - lastActivityMs) / 3600000;
+  const ageBucket = getAgeBucket(ageHours);
+  const isStale = ageBucket === "stale";
+  const isWatch = ageBucket === "aging";
   const FOUR_HOURS_MIN = 4 * 60;
   const FORTY_EIGHT_HOURS_MIN = 48 * 60;
-  const isStale = minutes >= FORTY_EIGHT_HOURS_MIN;
-  const isWatch = minutes >= FOUR_HOURS_MIN && minutes < FORTY_EIGHT_HOURS_MIN;
+  const isStaleForBadge = ageBucket === "stale";
 
-  let agingBorder = "1px solid #e5e7eb";
-  if (minutes >= FORTY_EIGHT_HOURS_MIN) agingBorder = "2px solid #ef4444"; // red
-  else if (isWatch) agingBorder = "2px solid #f59e0b"; // amber
+  const agingStyles = {
+    fresh: { background: "#f0fdf4", border: "1px solid #bbf7d0" } as const,
+    aging: { background: "#fffbeb", border: "1px solid #fde68a" } as const,
+    stale: { background: "#fef2f2", border: "2px solid #fecaca" } as const,
+  };
+  const { background: agingBackground, border: agingBorder } = agingStyles[ageBucket];
 
   // Check if client left a message/question without AGENCY reply
   const hasUnansweredClientMessage = React.useMemo(() => {
@@ -386,7 +418,7 @@ function DraggableCard({
     overflow: "visible",
     transform: CSS.Translate.toString(transform),
     transition: "box-shadow 120ms ease, transform 120ms ease",
-    background: isStale ? "#fef2f2" : isAtRisk || isWatch ? "#fffbeb" : "#f0fdf4",
+    background: agingBackground,
     padding: 10,
     borderRadius: 8,
     marginBottom: 8,
@@ -399,7 +431,7 @@ function DraggableCard({
     <div
       ref={setNodeRef}
       style={style}
-      data-stale={isStale ? "true" : "false"}
+      data-stale={ageBucket === "stale" ? "true" : "false"}
       onClick={(e) => {
         if (isDragging) return;
         onClick?.(e, submission);
@@ -447,7 +479,7 @@ function DraggableCard({
           ⚠ At Risk
         </div>
       )}
-      {isStale && (
+      {isStaleForBadge && (
         <div
           style={{
             position: "absolute",
@@ -502,10 +534,13 @@ function DraggableCard({
             display: "block",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 600 }}>
-              {fullName} — AI Ranking #{rank ?? "—"}
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ fontWeight: 600 }}>{fullName}</div>
+            {rank != null && (
+              <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 400 }}>
+                AI rank #{rank}
+              </div>
+            )}
           </div>
           {submission.candidate.title && (
   <div style={{ fontSize: 12, color: "#6b7280" }}>
@@ -817,6 +852,11 @@ export default function KanbanLane({
 }: Props) {
   const [sortMode, setSortMode] = React.useState<"OLDEST" | "NEWEST" | "PRIORITY">("OLDEST");
   const [staleOnly, setStaleOnly] = React.useState(false);
+  const [, setAgingTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = setInterval(() => setAgingTick((t) => t + 1), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const isClient = role === "CLIENT";
   const staleLabel = isClient ? "need follow-up" : "stale";
