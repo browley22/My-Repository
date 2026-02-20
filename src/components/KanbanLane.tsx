@@ -537,7 +537,7 @@ function DraggableCard({
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ fontWeight: 600 }}>{fullName}</div>
             <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 400 }}>
-              AI rank #{rank ?? "—"}
+              AI Match Rank #{rank ?? "—"}
             </div>
           </div>
           {submission.candidate.title && (
