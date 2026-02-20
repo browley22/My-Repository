@@ -495,9 +495,10 @@ export default function CandidateDetailSheet({
         </div>
         )}
 
-        {activeTab !== "RESUME" && (role !== "CLIENT" || activeTab !== "YOUR_DECISION") && (
+        {/* Right-panel content: for CLIENT only when Write-up tab (no "Your Decision" section here); for AGENCY when not Resume. */}
+        {activeTab !== "RESUME" && (role !== "CLIENT" || activeTab === "WRITEUP") && (
         <div className="space-y-6 p-4">
-          {/* Actions - AGENCY only */}
+          {/* Actions - AGENCY only; CLIENT has no right-panel decision section (decisions only in Your Decision tab) */}
           {role !== "CLIENT" && (
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Actions</h3>
