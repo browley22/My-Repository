@@ -38,6 +38,8 @@ type Submission = {
 type Props = {
   columns: string[];
   submissions: Submission[];
+  /** AI rank per submission (1 = best fitScore); only entries for submissions with fitScore */
+  rankBySubmissionId?: Map<string, number>;
   onMove: (id: string, newStatus: string) => Promise<void>;
   onCardClick?: (e: React.MouseEvent<HTMLElement>, submission: Submission) => void;
   onBeforeJumpToStale?: () => void;
@@ -119,6 +121,7 @@ function getSubmissionPriorityScore(submission: Submission): number {
 
 function DraggableCard({
   submission,
+  rank,
   onClick,
   role,
   isSelected,
@@ -133,6 +136,7 @@ function DraggableCard({
   onOpenResumeViewer,
 }: {
   submission: Submission;
+  rank?: number;
   onClick?: (e: React.MouseEvent<HTMLElement>, submission: Submission) => void;
   role?: "CLIENT" | "AGENCY";
   isSelected?: boolean;
@@ -499,7 +503,12 @@ function DraggableCard({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 600 }}>{fullName}</div>
+            <div style={{ fontWeight: 600 }}>
+              {fullName}
+              {rank != null && (
+                <span style={{ fontWeight: 500, color: "#6b7280", marginLeft: 4 }}>#{rank}</span>
+              )}
+            </div>
             {submission.fitScore !== null && submission.fitScore !== undefined && (
               <div
                 style={{

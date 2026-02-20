@@ -2344,6 +2344,7 @@ export default function RequisitionBoardClient({
         <KanbanLane
           columns={columns}
           submissions={filteredSubmissions as any}
+          rankBySubmissionId={rankBySubmissionId}
           onMove={handleMove as any}
           onCardClick={handleCardClick as any}
           onBeforeJumpToStale={() => {
