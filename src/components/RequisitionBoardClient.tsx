@@ -178,10 +178,12 @@ export default function RequisitionBoardClient({
   const modePopoverRef = React.useRef<HTMLDivElement | null>(null);
   const bottleneckButtonRef = React.useRef<HTMLDivElement | null>(null);
   const bottleneckPopoverRef = React.useRef<HTMLDivElement | null>(null);
+  const rankSummaryButtonRef = React.useRef<HTMLDivElement | null>(null);
+  const rankSummaryPopoverRef = React.useRef<HTMLDivElement | null>(null);
   const suggestionsButtonRef = React.useRef<HTMLDivElement | null>(null);
   const suggestionsPopoverRef = React.useRef<HTMLDivElement | null>(null);
   const [insightsTab, setInsightsTab] = React.useState<"Recent Activity" | "Today" | "Pipeline Velocity" | "Win Rate" | "Hiring Forecast">("Today");
-  type ToolbarDropdown = "insights" | "view" | "quickViews" | "mode" | "bottleneck" | "suggestions";
+  type ToolbarDropdown = "insights" | "view" | "quickViews" | "mode" | "bottleneck" | "ranksummary" | "suggestions";
   const [toolbarOpen, setToolbarOpen] = React.useState<ToolbarDropdown | null>(null);
   const insightsOpen = toolbarOpen === "insights";
   React.useEffect(() => {
@@ -197,6 +199,7 @@ export default function RequisitionBoardClient({
         [quickViewsButtonRef, quickViewsPopoverRef],
         [modeButtonRef, modePopoverRef],
         [bottleneckButtonRef, bottleneckPopoverRef],
+        [rankSummaryButtonRef, rankSummaryPopoverRef],
         [suggestionsButtonRef, suggestionsPopoverRef],
       ];
       const isInside = pairs.some(([btn, pop]) => btn.current?.contains(target) || pop.current?.contains(target));
@@ -995,6 +998,23 @@ export default function RequisitionBoardClient({
     sorted.forEach((s, i) => map.set(s.id, i + 1));
     return map;
   }, [submissions]);
+
+  // Ranked list for Rank Summary tab (same order as rankBySubmissionId)
+  const rankedSubmissionsForSummary = React.useMemo(() => {
+    const withScore = submissions.filter((s) => s.fitScore != null);
+    return [...withScore].sort((a, b) => {
+      const scoreA = a.fitScore ?? 0;
+      const scoreB = b.fitScore ?? 0;
+      if (scoreB !== scoreA) return scoreB - scoreA;
+      const timeA = new Date((a as any).evaluatedAt ?? (a as any).updatedAt ?? (a as any).createdAt ?? 0).getTime();
+      const timeB = new Date((b as any).evaluatedAt ?? (b as any).updatedAt ?? (b as any).createdAt ?? 0).getTime();
+      return timeB - timeA;
+    });
+  }, [submissions]);
+  const notYetEvaluatedSubmissions = React.useMemo(
+    () => submissions.filter((s) => s.fitScore == null),
+    [submissions]
+  );
 
   const getNextStatus = (status: string): string | null => {
     const map: Record<string, string> = {
@@ -1814,6 +1834,105 @@ export default function RequisitionBoardClient({
                   </>
                 ) : (
                   <div style={{ fontSize: 12, color: "#64748b" }}><strong>Bottleneck:</strong> Not enough data yet</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div ref={rankSummaryButtonRef} style={{ position: "relative" }}>
+          <button
+            type="button"
+            onClick={() => setToolbarOpen((v) => (v === "ranksummary" ? null : "ranksummary"))}
+            style={{
+              padding: "8px 14px",
+              fontSize: 12,
+              border: "1px solid #e2e8f0",
+              borderBottom: "none",
+              borderRadius: "6px 6px 0 0",
+              marginBottom: "-1px",
+              background: toolbarOpen === "ranksummary" ? "#e0f2fe" : "#fff",
+              color: toolbarOpen === "ranksummary" ? "#0369a1" : "#475569",
+              cursor: "pointer",
+              fontWeight: toolbarOpen === "ranksummary" ? 600 : 400,
+            }}
+          >
+            Rank Summary
+          </button>
+          {toolbarOpen === "ranksummary" && (
+            <div
+              ref={rankSummaryPopoverRef}
+              style={{ position: "absolute", top: "100%", left: 0, marginTop: 4, minWidth: 360, maxWidth: 480, maxHeight: "min(70vh, 420px)", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)", zIndex: 50, overflow: "hidden", display: "flex", flexDirection: "column" }}
+            >
+              <div style={{ padding: 12, overflowY: "auto", flex: 1 }}>
+                <div style={{ fontWeight: 600, color: "#334155", marginBottom: 10, fontSize: 14 }}>AI Match Rank Summary</div>
+                {rankedSubmissionsForSummary.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {rankedSubmissionsForSummary.map((sub) => {
+                      const rank = rankBySubmissionId.get(sub.id);
+                      const name = `${sub.candidate?.firstName ?? ""} ${sub.candidate?.lastName ?? ""}`.trim() || "—";
+                      const strengths = Array.isArray(sub.strengths) ? sub.strengths : [];
+                      const gaps = Array.isArray(sub.gaps) ? sub.gaps : [];
+                      const sellingPoints = Array.isArray(sub.sellingPoints) ? sub.sellingPoints : [];
+                      const confidence = sub.confidence != null ? Math.round(Number(sub.confidence) * 100) : null;
+                      const topBadge = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
+                      return (
+                        <div
+                          key={sub.id}
+                          onClick={(e) => handleCardClick(e, sub)}
+                          style={{ padding: 8, border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer", background: "#fafafa" }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                            {topBadge && <span style={{ fontSize: 14 }}>{topBadge}</span>}
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>
+                              AI Match Rank #{rank} — {name}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>
+                            Fit Score {sub.fitScore ?? "—"}/100
+                            {confidence != null && ` · Confidence ${confidence}%`}
+                          </div>
+                          {(strengths.length > 0 || gaps.length > 0 || sellingPoints.length > 0) && (
+                            <div style={{ fontSize: 11, color: "#475569", display: "flex", flexDirection: "column", gap: 2 }}>
+                              {strengths.slice(0, 2).map((s, i) => (
+                                <div key={i}>• Strengths: {s}</div>
+                              ))}
+                              {gaps.slice(0, 1).map((s, i) => (
+                                <div key={i}>• Gaps/Risks: {s}</div>
+                              ))}
+                              {sellingPoints.slice(0, 1).map((s, i) => (
+                                <div key={i}>• How to pitch: {s}</div>
+                              ))}
+                            </div>
+                          )}
+                          {sub.fitSummary && strengths.length === 0 && gaps.length === 0 && (
+                            <div style={{ fontSize: 11, color: "#475569" }}>{sub.fitSummary}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 10 }}>No candidates evaluated yet.</div>
+                )}
+                {notYetEvaluatedSubmissions.length > 0 && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid #e5e7eb" }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, color: "#64748b", marginBottom: 6 }}>Not yet evaluated</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      {notYetEvaluatedSubmissions.map((sub) => {
+                        const name = `${sub.candidate?.firstName ?? ""} ${sub.candidate?.lastName ?? ""}`.trim() || "—";
+                        return (
+                          <div
+                            key={sub.id}
+                            onClick={(e) => handleCardClick(e, sub)}
+                            style={{ fontSize: 12, color: "#94a3b8", cursor: "pointer" }}
+                          >
+                            {name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
