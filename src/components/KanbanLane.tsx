@@ -759,6 +759,7 @@ function getColumnActivityLabel(submissions: Submission[]): "High activity" | "M
 function DroppableColumn({
   status,
   submissions,
+  rankBySubmissionId,
   onCardClick,
   role,
   selectedIds,
@@ -774,6 +775,7 @@ function DroppableColumn({
 }: {
   status: string;
   submissions: Submission[];
+  rankBySubmissionId?: Map<string, number>;
   onCardClick?: (e: React.MouseEvent<HTMLElement>, submission: Submission) => void;
   role?: "CLIENT" | "AGENCY";
   selectedIds?: Set<string>;
@@ -816,6 +818,7 @@ function DroppableColumn({
         <DraggableCard
           key={sub.id}
           submission={sub}
+          rank={rankBySubmissionId?.get(sub.id)}
           onClick={onCardClick}
           role={role}
           isSelected={selectedIds?.has(sub.id)}
@@ -837,6 +840,7 @@ function DroppableColumn({
 export default function KanbanLane({
   columns,
   submissions,
+  rankBySubmissionId,
   onMove,
   onCardClick,
   onBeforeJumpToStale,
@@ -1050,6 +1054,7 @@ export default function KanbanLane({
             status={status}
             role={role}
             selectedIds={selectedIds}
+            rankBySubmissionId={rankBySubmissionId}
             onToggleSelect={onToggleSelect}
             submissions={submissions
               .filter((s) => {
