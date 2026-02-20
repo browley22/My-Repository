@@ -11,8 +11,9 @@ export const runtime = "nodejs";
 /** PUT: update job description from JSON body { jobDescription: string } */
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const params = await Promise.resolve(ctx.params);
   const id = params?.id;
   const session = await getServerSession(authOptions);
 
@@ -77,8 +78,9 @@ export async function PUT(
 /** POST: multipart/form-data with a text file; extract text and save as job description */
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> | { id: string } }
 ) {
+  const params = await Promise.resolve(ctx.params);
   const id = params?.id;
   const session = await getServerSession(authOptions);
   if (!session?.user) {
