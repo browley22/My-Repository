@@ -56,6 +56,14 @@ const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" |
   { value: "Follow up needed", label: "Follow up needed", category: "waiting" },
   { value: "Done", label: "Done", category: "done" },
 ];
+
+const CLIENT_DECISION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
+  { value: "—", label: "—", category: "internal" },
+  { value: "Needs your decision", label: "Needs your decision", category: "waiting" },
+  { value: "Review update", label: "Review update", category: "client" },
+  { value: "Schedule interview", label: "Schedule interview", category: "candidate" },
+  { value: "Review offer", label: "Review offer", category: "client" },
+];
 const NEXT_ACTION_STYLES: Record<string, { bg: string; text: string }> = {
   waiting: { bg: "#fef9c3", text: "#854d0e" },
   client: { bg: "#bfdbfe", text: "#1e40af" },
@@ -326,13 +334,13 @@ function DraggableCard({
   // Determine next step hint (wording by role for client view)
   const nextStepHint = React.useMemo(() => {
     if (isStale) {
-      return role === "CLIENT" ? "Reply or take action" : "Follow up with client";
+      return role === "CLIENT" ? "Needs your decision" : "Follow up with client";
     }
     if (submission.status === "INTERVIEW_REQUESTED") {
       return "Schedule interview";
     }
     if (submission.status === "OFFER_PENDING" || submission.status === "OFFERED") {
-      return "Prepare offer";
+      return role === "CLIENT" ? "Review offer" : "Prepare offer";
     }
     if (hasRecentClientActivity) {
       return "Review update";
@@ -421,7 +429,7 @@ function DraggableCard({
             fontWeight: 600,
           }}
         >
-          {role === "CLIENT" ? "Needs follow-up" : "Needs Attention"}
+          {role === "CLIENT" ? "Needs your decision" : "Needs Attention"}
         </div>
       )}
       {role !== "CLIENT" && !hasOwner && (
@@ -537,11 +545,14 @@ function DraggableCard({
             </div>
           )}
           {(() => {
+            const isClient = role === "CLIENT";
+            const optionsList = isClient ? CLIENT_DECISION_OPTIONS : NEXT_ACTION_OPTIONS;
             const displayAction = nextActionOverride ?? nextStepHint ?? "—";
-            const option = NEXT_ACTION_OPTIONS.find((o) => o.value === displayAction);
+            const option = optionsList.find((o) => o.value === displayAction) ?? NEXT_ACTION_OPTIONS.find((o) => o.value === displayAction);
             const category = option?.category ?? "internal";
             const style = NEXT_ACTION_STYLES[category] ?? NEXT_ACTION_STYLES.internal;
             const updatedAgo = days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`;
+            const label = isClient ? "Your Decision" : "Next Action";
             return (
               <div
                 style={{ marginTop: 6 }}
@@ -557,9 +568,9 @@ function DraggableCard({
                     border: "1px solid rgba(0,0,0,0.06)",
                   }}
                 >
-                  <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginBottom: 2 }}>Next Action</div>
+                  <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginBottom: 2 }}>{label}</div>
                   <select
-                    value={displayAction}
+                    value={optionsList.some((o) => o.value === displayAction) ? displayAction : "—"}
                     onChange={(e) => setNextActionOverride(e.target.value)}
                     style={{
                       fontSize: 11,
@@ -576,7 +587,7 @@ function DraggableCard({
                       minWidth: 140,
                     }}
                   >
-                    {NEXT_ACTION_OPTIONS.map((o) => (
+                    {optionsList.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
                   </select>
