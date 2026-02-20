@@ -1,13 +1,21 @@
-@import "tailwindcss";
+/* If you are using Tailwind v3, use these instead:
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+*/
+
+/* If you are using Tailwind v4, this import is correct: */
+/* @import "tailwindcss"; */
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
-}
 
-@theme inline {
+  /* tokens that your app / Tailwind can reference */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  /* only keep these if you actually define these font variables somewhere */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,6 +24,9 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
   }
 }
 

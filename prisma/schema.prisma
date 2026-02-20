@@ -23,10 +23,12 @@ enum SubmissionStatus {
 }
 
 enum DecisionType {
+  STATUS_CHANGE
   REQUEST_INTERVIEW
   MAKE_OFFER
   DECLINE
   QUESTION
+  AI_EVALUATION
 }
 
 enum DeclineReason {
@@ -59,13 +61,14 @@ model User {
 }
 
 model Requisition {
-  id           String        @id @default(cuid())
-  clientId     String
-  client       Client        @relation(fields: [clientId], references: [id])
-  title        String
-  location     String?
-  submissions  Submission[]
-  createdAt    DateTime     @default(now())
+  id             String        @id @default(cuid())
+  clientId       String
+  client         Client        @relation(fields: [clientId], references: [id])
+  title          String
+  location       String?
+  jobDescription String?
+  submissions    Submission[]
+  createdAt      DateTime     @default(now())
 }
 
 model Candidate {
@@ -77,21 +80,30 @@ model Candidate {
   yearsExp     Int?
   rate         String?
   availability String?
+  resumeUrl    String?       // optional
   submissions  Submission[]
   createdAt    DateTime     @default(now())
 }
 
 model Submission {
-  id             String           @id @default(cuid())
-  requisitionId  String
-  requisition    Requisition      @relation(fields: [requisitionId], references: [id])
-  candidateId    String
-  candidate      Candidate        @relation(fields: [candidateId], references: [id])
-  status         SubmissionStatus @default(SUBMITTED)
-  messages       Message[]
-  events         DecisionEvent[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id                     String           @id @default(cuid())
+  requisitionId          String
+  requisition            Requisition      @relation(fields: [requisitionId], references: [id])
+  candidateId            String
+  candidate              Candidate        @relation(fields: [candidateId], references: [id])
+  status                 SubmissionStatus @default(SUBMITTED)
+  messages               Message[]
+  events                 DecisionEvent[]
+  fitScore               Int?
+  fitSummary             String?
+  strengths              Json?            // string[]
+  gaps                   Json?            // string[]
+  sellingPoints          Json?            // string[]
+  objectionsAndRebuttals Json?            // { objection: string, rebuttal: string }[]
+  confidence             Float?
+  evaluatedAt            DateTime?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   @@index([requisitionId])
   @@index([candidateId])
@@ -111,8 +123,13 @@ model DecisionEvent {
   id            String        @id @default(cuid())
   submissionId  String
   submission    Submission    @relation(fields: [submissionId], references: [id])
+
   type          DecisionType
   note          String?
   declineReason DeclineReason?
+
+  fromStatus    SubmissionStatus?
+  toStatus      SubmissionStatus?
+
   createdAt     DateTime      @default(now())
 }
