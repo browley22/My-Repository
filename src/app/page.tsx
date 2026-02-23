@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "./api/auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
@@ -24,18 +25,20 @@ export default async function Home() {
     ],
   });
 
-  // Group requisitions by company
-  const requisitionsByCompany = requisitions.reduce((acc, req) => {
-    const companyName = req.client.name;
-    if (!acc[companyName]) {
-      acc[companyName] = [];
+  // Group requisitions by client (id) for stable keys and client link
+  const byClient = requisitions.reduce((acc, req) => {
+    const id = req.client.id;
+    if (!acc[id]) {
+      acc[id] = { clientId: id, clientName: req.client.name, requisitions: [] };
     }
-    acc[companyName].push(req);
+    acc[id].requisitions.push(req);
     return acc;
-  }, {} as Record<string, typeof requisitions>);
+  }, {} as Record<string, { clientId: string; clientName: string; requisitions: typeof requisitions }>);
+  const clientGroups = Object.values(byClient);
 
   return (
     <div style={{ padding: 40 }}>
+      <style>{`.client-name-link:hover { text-decoration: underline; }`}</style>
       <h1>CVRenova Dashboard</h1>
       <p>Logged in as: {session.user?.email}</p>
       <p>Role: {(session.user as any)?.role}</p>
@@ -44,9 +47,21 @@ export default async function Home() {
 
       <h2>Requisitions</h2>
 
-      {Object.entries(requisitionsByCompany).map(([companyName, companyRequisitions]) => (
-        <div key={companyName} style={{ marginBottom: 24 }}>
-          <h3 style={{ marginBottom: 8, fontSize: 18, fontWeight: 600 }}>{companyName}</h3>
+      {clientGroups.map(({ clientId, clientName, requisitions: companyRequisitions }) => (
+        <div key={clientId} style={{ marginBottom: 24 }}>
+          <h3 style={{ marginBottom: 8, fontSize: 18, fontWeight: 600 }}>
+            <Link
+              href={`/clients/${clientId}`}
+              style={{
+                color: "#0369a1",
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+              className="client-name-link"
+            >
+              {clientName}
+            </Link>
+          </h3>
           <ul style={{ marginLeft: 20, marginTop: 0 }}>
             {companyRequisitions.map((req) => (
               <li key={req.id} style={{ marginBottom: 4 }}>
