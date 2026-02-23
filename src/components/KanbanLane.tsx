@@ -573,7 +573,7 @@ function DraggableCard({
   const saveSummary = React.useCallback(
     async (text: string) => {
       const candidateId = submission.candidate?.id ?? null;
-      if (!candidateId) {
+      if (candidateId == null || candidateId === "") {
         setSummaryError("Missing candidate id; cannot save summary.");
         return;
       }
@@ -591,20 +591,30 @@ function DraggableCard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ summaryText }),
         });
-        const data = await res.json().catch(() => ({})) as { error?: string; detail?: string; summaryText?: string; ok?: boolean };
+        const bodyText = await res.text();
+        let data: { error?: string; detail?: string; summaryText?: string; ok?: boolean } = {};
+        try {
+          if (bodyText) data = JSON.parse(bodyText) as typeof data;
+        } catch {
+          // non-JSON response (e.g. HTML error page)
+        }
         if (!res.ok) {
           const parts = [data?.error, data?.detail].filter(Boolean);
-          const msg = parts.length > 0 ? parts.join(" — ") : `Request failed (${res.status})`;
+          const msg =
+            parts.length > 0
+              ? parts.join(" — ")
+              : `Request failed (${res.status})${bodyText ? `: ${bodyText.slice(0, 200)}` : ""}`;
           setSummaryError(msg);
           if (process.env.NODE_ENV === "development") {
-            console.error("[Summary save] failed", { status: res.status, statusText: res.statusText, body: data });
+            console.error("[Summary save] failed", { status: res.status, statusText: res.statusText, body: data, bodyText });
           }
           return;
         }
         const savedText = data?.summaryText ?? summaryText;
         setLocalSummary(savedText);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to save summary.";
+        const message = err instanceof Error ? err.message : "Failed to save summary.";
+        const msg = message === "Failed to fetch" ? "Network error: could not reach the server. Check your connection." : message;
         setSummaryError(msg);
         if (process.env.NODE_ENV === "development") {
           console.error("[Summary save] error", err);
@@ -613,7 +623,7 @@ function DraggableCard({
         setSummarySaving(false);
       }
     },
-    [submission.candidate.id]
+    [submission.candidate?.id]
   );
 
   const handleSummaryDragOver = React.useCallback(
