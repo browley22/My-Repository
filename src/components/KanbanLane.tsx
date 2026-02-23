@@ -849,73 +849,74 @@ function DraggableCard({
           <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
             Updated {days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`}
           </div>
-          {(() => {
-            const isClient = role === "CLIENT";
-            const optionsList = isClient ? CLIENT_DECISION_OPTIONS : NEXT_ACTION_OPTIONS;
-            const displayAction = nextActionOverride ?? nextStepHint ?? "—";
-            const option = optionsList.find((o) => o.value === displayAction) ?? NEXT_ACTION_OPTIONS.find((o) => o.value === displayAction);
-            const category = option?.category ?? "internal";
-            const style = NEXT_ACTION_STYLES[category] ?? NEXT_ACTION_STYLES.internal;
-            const updatedAgo = days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`;
-            const label = isClient ? "Your Decision" : "Next Action";
-            const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-              const v = e.target.value;
-              setNextActionOverride(v);
-              if (!isClient || v === "—") return;
-              const id = submission.id;
-              if (v === "Interested" && onMarkInterested) void onMarkInterested(id);
-              else if (v === "Need Info" && onNeedInfo) void onNeedInfo(id);
-              else if (v === "Request Interview" && onRequestInterview) void onRequestInterview(id);
-              else if (v === "Make Offer" && onMakeOffer) void onMakeOffer(id);
-              else if (v === "Offer Declined" && onOfferDeclined) void onOfferDeclined(id);
-              else if (v === "Pass" && onMarkPass) void onMarkPass(id);
-              else if (v === "Feedback" && onAddFeedback) {
-                const note = typeof window !== "undefined" ? window.prompt("Add feedback for agency:") : null;
-                if (note != null && note.trim()) void onAddFeedback(id, note.trim());
-              }
-            };
-            return (
-              <div
-                style={{ marginTop: 6 }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div
-                  style={{
-                    display: "inline-block",
-                    padding: "6px 10px",
-                    borderRadius: 8,
-                    background: style.bg,
-                    color: style.text,
-                    border: "1px solid rgba(0,0,0,0.06)",
-                  }}
-                >
-                  <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginBottom: 2 }}>{label}</div>
-                  <select
-                    value={optionsList.some((o) => o.value === displayAction) ? displayAction : "—"}
-                    onChange={handleSelectChange}
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 500,
-                      padding: "2px 4px",
-                      margin: 0,
-                      borderRadius: 4,
-                      border: "none",
-                      background: "transparent",
-                      color: "inherit",
-                      cursor: "pointer",
-                      outline: "none",
-                      width: "100%",
-                      minWidth: 140,
-                    }}
+          {role === "AGENCY"
+            ? null
+            : (() => {
+                const isClient = role === "CLIENT";
+                const optionsList = isClient ? CLIENT_DECISION_OPTIONS : NEXT_ACTION_OPTIONS;
+                const displayAction = nextActionOverride ?? nextStepHint ?? "—";
+                const option = optionsList.find((o) => o.value === displayAction) ?? NEXT_ACTION_OPTIONS.find((o) => o.value === displayAction);
+                const category = option?.category ?? "internal";
+                const style = NEXT_ACTION_STYLES[category] ?? NEXT_ACTION_STYLES.internal;
+                const label = isClient ? "Your Decision" : "Next Action";
+                const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const v = e.target.value;
+                  setNextActionOverride(v);
+                  if (!isClient || v === "—") return;
+                  const id = submission.id;
+                  if (v === "Interested" && onMarkInterested) void onMarkInterested(id);
+                  else if (v === "Need Info" && onNeedInfo) void onNeedInfo(id);
+                  else if (v === "Request Interview" && onRequestInterview) void onRequestInterview(id);
+                  else if (v === "Make Offer" && onMakeOffer) void onMakeOffer(id);
+                  else if (v === "Offer Declined" && onOfferDeclined) void onOfferDeclined(id);
+                  else if (v === "Pass" && onMarkPass) void onMarkPass(id);
+                  else if (v === "Feedback" && onAddFeedback) {
+                    const note = typeof window !== "undefined" ? window.prompt("Add feedback for agency:") : null;
+                    if (note != null && note.trim()) void onAddFeedback(id, note.trim());
+                  }
+                };
+                return (
+                  <div
+                    style={{ marginTop: 6 }}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {optionsList.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            );
-          })()}
+                    <div
+                      style={{
+                        display: "inline-block",
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        background: style.bg,
+                        color: style.text,
+                        border: "1px solid rgba(0,0,0,0.06)",
+                      }}
+                    >
+                      <div style={{ fontSize: 9, fontWeight: 600, opacity: 0.9, marginBottom: 2 }}>{label}</div>
+                      <select
+                        value={optionsList.some((o) => o.value === displayAction) ? displayAction : "—"}
+                        onChange={handleSelectChange}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 500,
+                          padding: "2px 4px",
+                          margin: 0,
+                          borderRadius: 4,
+                          border: "none",
+                          background: "transparent",
+                          color: "inherit",
+                          cursor: "pointer",
+                          outline: "none",
+                          width: "100%",
+                          minWidth: 140,
+                        }}
+                      >
+                        {optionsList.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })()}
         </button>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
