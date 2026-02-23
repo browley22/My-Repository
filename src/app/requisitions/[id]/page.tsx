@@ -59,13 +59,14 @@ if (!requisition) {
 return <div>Requisition not found.</div>;
 }
 
-// Enrich candidate objects with resumeUrl for the client UI, without schema changes.
+// Enrich candidate objects with resumeUrl and summary for the client UI, without schema changes.
 const submissionsWithResume = requisition.submissions.map((s: any) => ({
   ...s,
   candidate: s.candidate
     ? {
         ...s.candidate,
         resumeUrl: getCandidateResumeUrl(s.candidate),
+        summary: (s.candidate as any).candidateSummaryText ?? (s.candidate as any).summary ?? null,
       }
     : s.candidate,
 }));

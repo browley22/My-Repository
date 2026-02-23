@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   useDraggable,
@@ -102,6 +103,11 @@ function prettyStatus(s?: string | null) {
     .replaceAll("_", " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isTextDrag(e: React.DragEvent): boolean {
+  const types = Array.from(e.dataTransfer?.types ?? []);
+  return types.includes("text/plain") || types.includes("Text");
 }
 
 function getColumnLabel(status: string, role?: "CLIENT" | "AGENCY") {
@@ -292,6 +298,23 @@ function DraggableCard({
   );
 
   const fullName = `${submission.candidate.firstName} ${submission.candidate.lastName}`;
+
+  const [localSummary, setLocalSummary] = React.useState<string>(
+    submission.candidate.summary ?? ""
+  );
+  const [summarySaving, setSummarySaving] = React.useState(false);
+  const [summaryError, setSummaryError] = React.useState<string | null>(null);
+  const [isSummaryDragOver, setIsSummaryDragOver] = React.useState(false);
+  const [summaryExpanded, setSummaryExpanded] = React.useState(false);
+  const [summaryOverlayRect, setSummaryOverlayRect] = React.useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const [pasteMode, setPasteMode] = React.useState(false);
+  const [pasteValue, setPasteValue] = React.useState("");
+
+  const cardRef = React.useRef<HTMLDivElement | null>(null);
 
   const latestTransition = submission.events
     ?.filter(
@@ -536,9 +559,123 @@ function DraggableCard({
     opacity: isDragging ? 0.85 : 1,
   };
 
+  React.useEffect(() => {
+    if (summaryExpanded) {
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setSummaryExpanded(false);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }
+    return undefined;
+  }, [summaryExpanded]);
+
+  const saveSummary = React.useCallback(
+    async (text: string) => {
+      if (!submission.candidate.id) {
+        setSummaryError("Missing candidate id; cannot save summary.");
+        return;
+      }
+      const trimmed = text.trim();
+      if (trimmed.length < 20) {
+        setSummaryError("Summary too short. Minimum 20 characters.");
+        return;
+      }
+      setSummaryError(null);
+      setSummarySaving(true);
+      try {
+        const res = await fetch(`/api/candidates/${submission.candidate.id}/summary`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ summaryText: trimmed }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          const msg = (data && (data.error || data.detail)) || "Failed to save summary.";
+          setSummaryError(String(msg));
+          return;
+        }
+        setLocalSummary(trimmed);
+      } catch (err) {
+        setSummaryError(err instanceof Error ? err.message : "Failed to save summary.");
+      } finally {
+        setSummarySaving(false);
+      }
+    },
+    [submission.candidate.id]
+  );
+
+  const handleSummaryDragOver = React.useCallback(
+    (e: React.DragEvent) => {
+      if (role !== "AGENCY") return;
+      if (!isTextDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsSummaryDragOver(true);
+    },
+    [role]
+  );
+
+  const handleSummaryDragLeave = React.useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsSummaryDragOver(false);
+    }
+  }, []);
+
+  const handleSummaryDrop = React.useCallback(
+    async (e: React.DragEvent) => {
+      if (role !== "AGENCY") return;
+      if (!isTextDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsSummaryDragOver(false);
+      const dt = e.dataTransfer;
+      const text =
+        dt?.getData("text/plain") ||
+        dt?.getData("Text") ||
+        "";
+      if (!text || text.trim().length < 20) {
+        setSummaryError("Summary too short. Minimum 20 characters.");
+        return;
+      }
+      await saveSummary(text);
+    },
+    [role, saveSummary]
+  );
+
+  const openSummaryOverlay = React.useCallback(() => {
+    if (!cardRef.current) {
+      setSummaryExpanded(true);
+      return;
+    }
+    const rect = cardRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const width = Math.min(680, viewportWidth - 40);
+    const left = Math.max(
+      20,
+      Math.min(rect.left + window.scrollX, viewportWidth - 20 - width)
+    );
+    const top = rect.top + window.scrollY;
+    setSummaryOverlayRect({ top, left, width });
+    setSummaryExpanded(true);
+  }, []);
+
+  const closeSummaryOverlay = React.useCallback(() => {
+    setSummaryExpanded(false);
+  }, []);
+
+  const truncatedSummary =
+    localSummary && localSummary.length > 160
+      ? `${localSummary.slice(0, 160)}…`
+      : localSummary;
+
   return (
+    <>
     <div
-      ref={setNodeRef}
+      ref={(el) => {
+        setNodeRef(el);
+        cardRef.current = el;
+      }}
       style={style}
       data-stale={ageBucket === "stale" ? "true" : "false"}
       onClick={(e) => {
@@ -830,21 +967,98 @@ function DraggableCard({
   </div>
 )}
 
-{submission.candidate.summary && (
-  <div
-    style={{
-      fontSize: 12,
-      color: "#6b7280",
-      marginTop: 4,
-      overflow: "hidden",
-      display: "-webkit-box",
-      WebkitLineClamp: 2,
-      WebkitBoxOrient: "vertical",
-    }}
-  >
-    {submission.candidate.summary}
-  </div>
-)}
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 11,
+          color: "#64748b",
+        }}
+        onClick={(e) => e.stopPropagation()}
+        onDragOver={handleSummaryDragOver}
+        onDragLeave={handleSummaryDragLeave}
+        onDrop={handleSummaryDrop}
+      >
+        <div style={{ fontWeight: 600, marginBottom: 2 }}>Summary</div>
+        {localSummary.trim() ? (
+          <div
+            style={{
+              position: "relative",
+              fontSize: 12,
+              color: "#4b5563",
+              padding: 8,
+              borderRadius: 6,
+              border: "1px solid #e5e7eb",
+              background: isSummaryDragOver ? "#f0f9ff" : "#f9fafb",
+            }}
+          >
+            <div
+              style={{
+                overflow: "hidden",
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {truncatedSummary}
+            </div>
+            {localSummary.length > 160 && (
+              <button
+                type="button"
+                onClick={() => openSummaryOverlay()}
+                style={{
+                  marginTop: 4,
+                  fontSize: 11,
+                  color: "#0369a1",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                }}
+              >
+                Expand
+              </button>
+            )}
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: 8,
+              borderRadius: 6,
+              border: isSummaryDragOver ? "1px dashed #0ea5e9" : "1px dashed #e5e7eb",
+              background: isSummaryDragOver ? "#f0f9ff" : "#f9fafb",
+              fontSize: 12,
+              color: "#9ca3af",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+          >
+            <span>Drop summary text here</span>
+            {role === "AGENCY" && (
+              <button
+                type="button"
+                onClick={() => setPasteMode(true)}
+                style={{
+                  fontSize: 11,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  border: "1px solid #cbd5f5",
+                  background: "#e0f2fe",
+                  color: "#0369a1",
+                  cursor: "pointer",
+                }}
+              >
+                Paste
+              </button>
+            )}
+          </div>
+        )}
+        {summaryError && (
+          <div style={{ marginTop: 4, fontSize: 11, color: "#b91c1c" }}>{summaryError}</div>
+        )}
+      </div>
 
           <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
             Updated {days > 0 ? `${days}d ago` : hours > 0 ? `${hours}h ago` : `${minutes}m ago`}
@@ -1072,6 +1286,70 @@ function DroppableColumn({
         />
       ))}
     </div>
+    {summaryExpanded && summaryOverlayRect &&
+      createPortal(
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "center",
+            padding: "40px 16px",
+          }}
+          onClick={closeSummaryOverlay}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: summaryOverlayRect.top,
+              left: summaryOverlayRect.left,
+              width: summaryOverlayRect.width,
+              maxWidth: 680,
+              background: "#ffffff",
+              borderRadius: 12,
+              boxShadow: "0 20px 45px rgba(15,23,42,0.45)",
+              padding: 16,
+              zIndex: 10000,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Summary — {fullName}</div>
+              <button
+                type="button"
+                onClick={closeSummaryOverlay}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 18,
+                  lineHeight: 1,
+                  cursor: "pointer",
+                  color: "#64748b",
+                }}
+                aria-label="Close summary"
+              >
+                ×
+              </button>
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: "#334155",
+                whiteSpace: "pre-wrap",
+                maxHeight: 320,
+                overflowY: "auto",
+              }}
+            >
+              {localSummary}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 

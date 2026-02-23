@@ -84,6 +84,7 @@ model Candidate {
   resumeUrl            String?       // optional
   resumeText           String?      // extracted at upload for in-app preview
   resumeTextUpdatedAt  DateTime?    // when resumeText was last set
+  candidateSummaryText String?      // freeform candidate summary text (card UI)
   submissions          Submission[]
   createdAt            DateTime      @default(now())
 }
