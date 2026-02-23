@@ -46,15 +46,14 @@ export async function POST(
       { status: 400 }
     );
   }
-
-  const updateData: { candidateSummaryText: string } = {
-    candidateSummaryText: clean,
-  };
+  if (!clean || clean.length < 20) {
+    throw new Error("Summary is empty/too short");
+  }
 
   try {
     const updated = await prisma.candidate.update({
       where: { id: candidateId },
-      data: updateData,
+      data: { candidateSummaryText: clean },
       select: { id: true, candidateSummaryText: true },
     });
     return NextResponse.json(
