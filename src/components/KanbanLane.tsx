@@ -9,6 +9,7 @@ import {
 } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { getSubmissionOwnerName } from "@/lib/submission-owner";
+import { uploadResumeFile } from "@/lib/resumeUpload";
 
 type Submission = {
   id: string;
@@ -56,6 +57,8 @@ type Props = {
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
   onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
+  /** Called after a resume is uploaded via card drop (AGENCY); e.g. router.refresh */
+  onResumeUploaded?: () => void;
 };
 
 const NEXT_ACTION_OPTIONS: { value: string; label: string; category: "waiting" | "client" | "candidate" | "internal" | "done" }[] = [
@@ -150,6 +153,22 @@ function getSubmissionPriorityScore(submission: Submission): number {
   return score;
 }
 
+function isFileDrag(e: React.DragEvent): boolean {
+  return e.dataTransfer?.types?.includes("Files") ?? false;
+}
+
+function getFirstFile(e: React.DragEvent): File | null {
+  if (e.dataTransfer?.items?.length) {
+    for (let i = 0; i < e.dataTransfer.items.length; i++) {
+      const item = e.dataTransfer.items[i];
+      if (item.kind === "file") {
+        return item.getAsFile();
+      }
+    }
+  }
+  return e.dataTransfer?.files?.length ? e.dataTransfer.files[0] : null;
+}
+
 function DraggableCard({
   submission,
   rank,
@@ -165,6 +184,7 @@ function DraggableCard({
   onMarkPass,
   onAddFeedback,
   onOpenResumeViewer,
+  onResumeUploaded,
 }: {
   submission: Submission;
   rank?: number;
@@ -180,6 +200,7 @@ function DraggableCard({
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
   onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
+  onResumeUploaded?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -187,6 +208,80 @@ function DraggableCard({
       disabled: role === "CLIENT",
     });
   const [nextActionOverride, setNextActionOverride] = React.useState<string | null>(null);
+
+  const candidateId = submission.candidate?.id ?? null;
+  const [isFileDragging, setIsFileDragging] = React.useState(false);
+  const [uploadStatus, setUploadStatus] = React.useState<null | "uploading" | "success" | "error">(null);
+  const [uploadMessage, setUploadMessage] = React.useState("");
+  const uploadInProgressRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (uploadStatus === "success" || uploadStatus === "error") {
+      const t = setTimeout(() => {
+        setUploadStatus(null);
+        setUploadMessage("");
+      }, 3000);
+      return () => clearTimeout(t);
+    }
+  }, [uploadStatus]);
+
+  const handleFileDragEnter = React.useCallback(
+    (e: React.DragEvent) => {
+      if (role !== "AGENCY" || !candidateId) return;
+      if (isFileDrag(e)) setIsFileDragging(true);
+    },
+    [role, candidateId]
+  );
+  const handleFileDragOver = React.useCallback(
+    (e: React.DragEvent) => {
+      if (role !== "AGENCY" || !candidateId) return;
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      setIsFileDragging(true);
+    },
+    [role, candidateId]
+  );
+  const handleFileDragLeave = React.useCallback((e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsFileDragging(false);
+  }, []);
+  const handleFileDrop = React.useCallback(
+    async (e: React.DragEvent) => {
+      if (role !== "AGENCY" || !candidateId) return;
+      if (!isFileDrag(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsFileDragging(false);
+      if (uploadInProgressRef.current) return;
+      const file = getFirstFile(e);
+      if (!file) {
+        setUploadStatus("error");
+        setUploadMessage("No file detected.");
+        return;
+      }
+      uploadInProgressRef.current = true;
+      setUploadStatus("uploading");
+      setUploadMessage("");
+      try {
+        const result = await uploadResumeFile(candidateId, file);
+        if (result.success) {
+          setUploadStatus("success");
+          setUploadMessage("Uploaded");
+          onResumeUploaded?.();
+        } else {
+          setUploadStatus("error");
+          setUploadMessage(result.error || "Upload failed");
+        }
+      } catch (err) {
+        setUploadStatus("error");
+        setUploadMessage(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        uploadInProgressRef.current = false;
+      }
+    },
+    [role, candidateId, onResumeUploaded]
+  );
 
   const fullName = `${submission.candidate.firstName} ${submission.candidate.lastName}`;
 
@@ -450,8 +545,91 @@ function DraggableCard({
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.boxShadow =
           isDragging ? "0 8px 20px rgba(0,0,0,0.08)" : "none";
-      }}      
+      }}
+      onDragEnter={handleFileDragEnter}
+      onDragOver={handleFileDragOver}
+      onDragLeave={handleFileDragLeave}
+      onDrop={handleFileDrop}
     >
+      {role === "AGENCY" && isFileDragging && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: 8,
+            background: "rgba(14, 165, 233, 0.12)",
+            border: "2px dashed #0ea5e9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#0369a1" }}>
+            Drop resume to upload
+          </span>
+        </div>
+      )}
+      {role === "AGENCY" && uploadStatus === "uploading" && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10,
+            pointerEvents: "none",
+          }}
+        >
+          <span style={{ fontSize: 11, color: "#64748b" }}>Uploading…</span>
+        </div>
+      )}
+      {role === "AGENCY" && uploadStatus === "success" && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            right: 8,
+            padding: "4px 8px",
+            borderRadius: 6,
+            background: "#dcfce7",
+            border: "1px solid #86efac",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "#166534",
+            zIndex: 10,
+            pointerEvents: "none",
+          }}
+        >
+          {uploadMessage}
+        </div>
+      )}
+      {role === "AGENCY" && uploadStatus === "error" && (
+        <div
+          style={{
+            position: "absolute",
+            bottom: 8,
+            left: 8,
+            right: 8,
+            padding: "4px 8px",
+            borderRadius: 6,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            fontSize: 10,
+            color: "#991b1b",
+            zIndex: 10,
+            pointerEvents: "none",
+          }}
+          title={uploadMessage}
+        >
+          {uploadMessage.length > 40 ? uploadMessage.slice(0, 37) + "…" : uploadMessage}
+        </div>
+      )}
       {onToggleSelect && role === "AGENCY" && (
         <div
           onClick={(e) => { e.stopPropagation(); onToggleSelect(submission.id); }}
@@ -820,6 +998,7 @@ function DroppableColumn({
   onMarkPass,
   onAddFeedback,
   onOpenResumeViewer,
+  onResumeUploaded,
 }: {
   status: string;
   submissions: Submission[];
@@ -836,6 +1015,7 @@ function DroppableColumn({
   onMarkPass?: (submissionId: string) => void | Promise<void>;
   onAddFeedback?: (submissionId: string, note: string) => void | Promise<void>;
   onOpenResumeViewer?: (url: string | null, candidateName?: string, filename?: string, resumeText?: string | null, candidateId?: string | null) => void;
+  onResumeUploaded?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -879,6 +1059,7 @@ function DroppableColumn({
           onMarkPass={onMarkPass}
           onAddFeedback={onAddFeedback}
           onOpenResumeViewer={onOpenResumeViewer}
+          onResumeUploaded={onResumeUploaded}
         />
       ))}
     </div>
@@ -903,6 +1084,7 @@ export default function KanbanLane({
   onMarkPass,
   onAddFeedback,
   onOpenResumeViewer,
+  onResumeUploaded,
 }: Props) {
   const [sortMode, setSortMode] = React.useState<"OLDEST" | "NEWEST" | "PRIORITY">("OLDEST");
   const [staleOnly, setStaleOnly] = React.useState(false);
@@ -1169,6 +1351,7 @@ export default function KanbanLane({
             onMarkPass={onMarkPass}
             onAddFeedback={onAddFeedback}
             onOpenResumeViewer={onOpenResumeViewer}
+            onResumeUploaded={onResumeUploaded}
           />
         ))}
       </div>

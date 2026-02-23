@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { getSubmissionOwnerName } from "@/lib/submission-owner";
+import { uploadResumeFile as uploadResumeFileLib } from "@/lib/resumeUpload";
 
 function formatTimeAgo(dateString: string) {
   const date = new Date(dateString);
@@ -158,11 +159,6 @@ export default function CandidateDetailSheet({
       .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
   }, [submission?.messages]);
 
-  const RESUME_ALLOWED_TYPES = [
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ];
   const uploadResumeFile = React.useCallback(
     async (file: File) => {
       if (!effectiveCandidateId) {
@@ -170,52 +166,22 @@ export default function CandidateDetailSheet({
         setLastUploadStatus("Missing candidateId");
         return;
       }
-      const url = `${window.location.origin}/api/candidates/${effectiveCandidateId}/resume`;
-      console.log("Resume upload URL:", url);
-      const valid =
-        RESUME_ALLOWED_TYPES.includes(file.type) ||
-        /\.(pdf|doc|docx)$/i.test(file.name);
-      if (!valid) {
-        setResumeError("Please upload a PDF, DOC, or DOCX file.");
-        return;
-      }
       setResumeError(null);
       setResumeUploading(true);
       setLastUploadStatus("Uploading...");
-      const form = new FormData();
-      form.append("file", file);
       try {
-        const res = await fetch(url, {
-          method: "POST",
-          body: form,
-        });
-        const raw = await res.text();
-        let data: { error?: string; detail?: string; resumeUrl?: string; warning?: string } = {};
-        try {
-          data = raw ? JSON.parse(raw) : {};
-        } catch {
-          data = {};
-        }
-        if (!res.ok) {
-          const errMsg = typeof data?.error === "string" ? data.error : `Upload failed (${res.status})`;
-          const detail = typeof data?.detail === "string" ? data.detail : raw || res.statusText;
-          const withDetail = detail ? `${errMsg} — ${detail}` : errMsg;
-          setResumeError(withDetail);
-          setLastUploadStatus("Upload failed: " + withDetail);
-          return;
-        }
-        const resumeUrl = typeof data?.resumeUrl === "string" ? data.resumeUrl : null;
-        if (resumeUrl) {
-          setLocalResumeUrl(resumeUrl);
-          setLastUploadStatus(typeof data?.warning === "string" ? data.warning : "Upload success");
+        const result = await uploadResumeFileLib(effectiveCandidateId, file);
+        if (result.success) {
+          if (result.resumeUrl) setLocalResumeUrl(result.resumeUrl);
+          setLastUploadStatus(result.warning ?? "Upload success");
+          router.refresh();
         } else {
-          setResumeError("Upload succeeded but server did not return resumeUrl");
-          setLastUploadStatus("Upload succeeded but server did not return resumeUrl; keys: " + Object.keys(data || {}).join(", "));
+          setResumeError(result.error);
+          setLastUploadStatus("Upload failed: " + result.error);
         }
-        router.refresh();
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to fetch";
-        setResumeError(`Upload failed (${msg}): ${url}`);
+        const msg = err instanceof Error ? err.message : "Failed to upload";
+        setResumeError(msg);
         setLastUploadStatus("Upload failed: " + msg);
         console.error("Resume upload error:", err);
       } finally {
@@ -288,6 +254,11 @@ export default function CandidateDetailSheet({
   // CLIENT: no "Your Decision" tab in popover; decisions live on card dropdown. Avoid broken state if activeTab is YOUR_DECISION.
   React.useEffect(() => {
     if (role === "CLIENT" && activeTab === "YOUR_DECISION") setActiveTab("WRITEUP");
+  }, [role, activeTab]);
+
+  // AGENCY: no Resume tab in panel; ensure we don't stay on RESUME.
+  React.useEffect(() => {
+    if (role === "AGENCY" && activeTab === "RESUME") setActiveTab("WRITEUP");
   }, [role, activeTab]);
 
   const isResumeTabActive = activeTab === "RESUME" && role === "AGENCY";
@@ -422,9 +393,11 @@ export default function CandidateDetailSheet({
               {c?.phone && <div>Phone: {c.phone}</div>}
               {!c?.email && !c?.phone && <div>No contact info</div>}
             </div>
+            {role !== "AGENCY" && (
             <p className="mt-2 text-sm text-gray-600">
               Status: <span className="font-medium">{submission.status}</span>
             </p>
+            )}
             <p className="mt-1 text-sm text-gray-600">
               Owner: <span className="font-medium">{getSubmissionOwnerName(submission) || "—"}</span>
             </p>
@@ -454,21 +427,20 @@ export default function CandidateDetailSheet({
           </div>
         </div>
 
-        {/* Tabs - CLIENT: Write-up, Resume (decisions on card dropdown). AGENCY: Resume only */}
+        {/* Tabs - CLIENT: Write-up, Resume (decisions on card dropdown). AGENCY: no tabs in panel. */}
+        {role === "CLIENT" && (
         <div className="border-b px-4 pt-2 flex gap-2 text-sm">
-          {role === "CLIENT" && (
-            <button
-              type="button"
-              className={`px-3 py-1 rounded-t-md border-b-2 ${
-                activeTab === "WRITEUP"
-                  ? "border-sky-500 text-sky-700 font-semibold"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("WRITEUP")}
-            >
-              Write-up
-            </button>
-          )}
+          <button
+            type="button"
+            className={`px-3 py-1 rounded-t-md border-b-2 ${
+              activeTab === "WRITEUP"
+                ? "border-sky-500 text-sky-700 font-semibold"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab("WRITEUP")}
+          >
+            Write-up
+          </button>
           <button
             type="button"
             className={`px-3 py-1 rounded-t-md border-b-2 ${
@@ -481,54 +453,10 @@ export default function CandidateDetailSheet({
             Resume
           </button>
         </div>
+        )}
 
-        {activeTab !== "RESUME" && (role !== "CLIENT" || activeTab !== "YOUR_DECISION") && (
+        {(role === "AGENCY" || (activeTab !== "RESUME" && (role !== "CLIENT" || activeTab !== "YOUR_DECISION"))) && (
         <div className="space-y-6 p-4">
-          {/* Actions - AGENCY only */}
-          {role !== "CLIENT" && (
-          <section>
-            <h3 className="text-sm font-semibold text-gray-700">Actions</h3>
-
-            <div className="mt-2 flex flex-wrap gap-2">
-              <button
-                className="rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                disabled={busy !== null}
-                onClick={async () => {
-                  setBusy("decline");
-                  await onDecline(submission.id);
-                  setBusy(null);
-                  onOpenChange(false);
-                }}
-              >
-                Decline
-              </button>
-            </div>
-
-            <div className="mt-4">
-              <div className="text-sm font-semibold text-gray-700">Feedback</div>
-              <textarea
-                className="mt-2 w-full rounded-md border border-gray-300 p-3 text-sm box-border"
-                style={{ width: "100%", minHeight: 140 }}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Add a note for the agency/recruiter (e.g., 'Strong fit—please schedule interview')"
-              />
-              <button
-                className="mt-2 rounded-md border px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-                disabled={busy !== null || note.trim().length === 0}
-                onClick={async () => {
-                  setBusy("feedback");
-                  await onAddFeedback(submission.id, note.trim());
-                  setNote("");
-                  setBusy(null);
-                }}
-              >
-                Send Feedback
-              </button>
-            </div>
-          </section>
-          )}
-
           {/* AI Fit - AGENCY only */}
           {role === "AGENCY" && (
           <section>
@@ -738,14 +666,14 @@ export default function CandidateDetailSheet({
             <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{c?.summary || "—"}</p>
           </section>
 
-          {/* Activity Timeline */}
+          {/* Activity Timeline - AGENCY: last 3 by default with Show more/less; CLIENT: last 5 with Show all (n)/Show less */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Activity</h3>
 
             <div className="mt-2 space-y-2 text-sm">
               {activity.length > 0 ? (
                 <>
-                  {(activityExpanded ? activity : activity.slice(0, 5)).map((e: any) => (
+                  {(activityExpanded ? activity : activity.slice(0, role === "AGENCY" ? 3 : 5)).map((e: any) => (
                     <div key={e.id} className="rounded-md border p-2 bg-gray-50 text-gray-800">
                       <div className="font-medium">
                         {e.type === "STATUS_CHANGE"
@@ -773,13 +701,13 @@ export default function CandidateDetailSheet({
                       <div className="text-xs text-gray-400">{formatTimeAgo(e.createdAt)}</div>
                     </div>
                   ))}
-                  {activity.length > 5 && (
+                  {(role === "AGENCY" ? activity.length > 3 : activity.length > 5) && (
                     <button
                       type="button"
                       className="text-xs text-sky-600 hover:underline"
                       onClick={() => setActivityExpanded((v) => !v)}
                     >
-                      {activityExpanded ? "Show less" : `Show all (${activity.length})`}
+                      {activityExpanded ? "Show less" : role === "AGENCY" ? "Show more" : `Show all (${activity.length})`}
                     </button>
                   )}
                 </>
@@ -829,7 +757,8 @@ export default function CandidateDetailSheet({
             </div>
           </section>
 
-          {/* Resume link (for context) */}
+          {/* Resume link (for context) - CLIENT only; AGENCY panel does not show this section */}
+          {role !== "AGENCY" && (
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Resume</h3>
             <div className="mt-2">
@@ -846,10 +775,11 @@ export default function CandidateDetailSheet({
               )}
             </div>
           </section>
+          )}
         </div>
         )}
 
-        {activeTab === "RESUME" && (
+        {activeTab === "RESUME" && role !== "AGENCY" && (
           <div className="p-4 h-[calc(100%-56px)] flex flex-col gap-3">
             <button
               type="button"
@@ -858,138 +788,6 @@ export default function CandidateDetailSheet({
             >
               ← Write-up
             </button>
-            {role === "AGENCY" && (
-              <>
-                {effectiveCandidateId == null && (
-                  <p className="text-sm text-red-600">Missing candidate id — cannot upload resume.</p>
-                )}
-                <input
-                  type="file"
-                  ref={resumeInputRef}
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) uploadResumeFile(f);
-                    e.target.value = "";
-                  }}
-                />
-                <div
-                  tabIndex={0}
-                  onDragEnter={handleResumeDragOver}
-                  onDragEnterCapture={handleResumeDragOver}
-                  onDragOver={handleResumeDragOver}
-                  onDragOverCapture={handleResumeDragOver}
-                  onDragLeave={handleResumeDragLeave}
-                  onDrop={handleResumeDrop}
-                  onDropCapture={handleResumeDrop}
-                  style={{
-                    border: isDragging ? "2px dashed #60a5fa" : "1px dashed #e5e7eb",
-                    background: isDragging ? "#eff6ff" : "#fff",
-                    borderRadius: 10,
-                    padding: 12,
-                    minHeight: 90,
-                    boxSizing: "border-box",
-                    pointerEvents: "auto",
-                  }}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={resumeUploading || !effectiveCandidateId}
-                      onClick={() => resumeInputRef.current?.click()}
-                      className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
-                    >
-                      {resumeUploading ? "Uploading…" : effectiveResumeUrl ? "Replace resume" : "Upload resume"}
-                    </button>
-                    {hasResume && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null, effectiveCandidateId ?? null)}
-                          className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                        >
-                          View resume
-                        </button>
-                        {effectiveResumeUrl && (
-                          <a
-                            href={effectiveResumeUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            download
-                            className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                          >
-                            Download
-                          </a>
-                        )}
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (!effectiveCandidateId) {
-                          setLastUploadStatus("Test: no candidate id");
-                          return;
-                        }
-                        const url = `${window.location.origin}/api/candidates/${effectiveCandidateId}/resume`;
-                        try {
-                          const res = await fetch(url, { method: "POST", body: new FormData() });
-                          const text = await res.text();
-                          let parsed: { error?: string } | null = null;
-                          try {
-                            parsed = JSON.parse(text);
-                          } catch {
-                            parsed = null;
-                          }
-                          const msg = parsed?.error ?? (text || res.statusText || String(res.status));
-                          setLastUploadStatus(`Test: ${res.status} — ${msg}`);
-                        } catch (e) {
-                          setLastUploadStatus(`Test: failed — ${e instanceof Error ? e.message : "Failed to fetch"}`);
-                        }
-                      }}
-                      className="rounded-md border border-amber-300 px-3 py-1 text-sm hover:bg-amber-50"
-                    >
-                      Test resume upload endpoint
-                    </button>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-500">or drop PDF, DOC, or DOCX here</p>
-                </div>
-                <div className="mt-2 rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500" style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
-                  {"--------------------------------\nDROP DEBUG\nevents: "}{dropEventCount}
-                  {"\ncandidateIdUsedForUpload: "}{effectiveCandidateId ?? "—"}
-                  {"\nsubmissionId: "}{submission?.id ?? "—"}
-                  {"\nfile: "}{lastDropFileName ?? "—"}
-                  {"\ntype: "}{lastDropFileType ?? "—"}
-                  {"\nstatus: "}{lastUploadStatus || "—"}
-                  {"\n--------------------------------"}
-                </div>
-              </>
-            )}
-            {role !== "AGENCY" && hasResume && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => onOpenResumeViewer?.(effectiveResumeUrl ?? null, candidateName, resumeFilename, submission?.candidate?.resumeText ?? null, effectiveCandidateId ?? null)}
-                  className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                >
-                  View resume
-                </button>
-                {effectiveResumeUrl && (
-                  <a
-                    href={effectiveResumeUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    download
-                    className="rounded-md border px-3 py-1 text-sm hover:bg-gray-50"
-                  >
-                    Download
-                  </a>
-                )}
-              </div>
-            )}
-            {role === "AGENCY" && resumeError && (
-              <p className="text-sm text-red-600">{resumeError}</p>
-            )}
             {hasResume ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button

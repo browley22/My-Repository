@@ -2488,6 +2488,7 @@ export default function RequisitionBoardClient({
           onMarkPass={role === "CLIENT" ? onMarkPass : undefined}
           onAddFeedback={role === "CLIENT" ? onAddFeedback : undefined}
           onOpenResumeViewer={(url, candidateName, filename, resumeText, candidateId) => setResumeViewer({ open: true, url: url ?? null, candidateName, filename, resumeText, candidateId: candidateId ?? null })}
+          onResumeUploaded={() => router.refresh()}
         />
       ) : (
         <div style={{ overflowX: "auto", border: "1px solid #e2e8f0", borderRadius: 8 }}>
