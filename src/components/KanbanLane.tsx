@@ -990,12 +990,91 @@ function DraggableCard({
           color: "#64748b",
         }}
         onClick={(e) => e.stopPropagation()}
-        onDragOver={handleSummaryDragOver}
-        onDragLeave={handleSummaryDragLeave}
-        onDrop={handleSummaryDrop}
+        {...(role === "AGENCY"
+          ? {
+              onDragOver: handleSummaryDragOver,
+              onDragLeave: handleSummaryDragLeave,
+              onDrop: handleSummaryDrop,
+            }
+          : {})}
       >
         <div style={{ fontWeight: 600, marginBottom: 2 }}>Summary</div>
-        {localSummary.trim() ? (
+        {role === "AGENCY" ? (
+          localSummary.trim() ? (
+            <div
+              style={{
+                position: "relative",
+                fontSize: 12,
+                color: "#4b5563",
+                padding: 8,
+                borderRadius: 6,
+                border: "1px solid #e5e7eb",
+                background: isSummaryDragOver ? "#f0f9ff" : "#f9fafb",
+              }}
+            >
+              <div
+                style={{
+                  overflow: "hidden",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: "vertical",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {truncatedSummary}
+              </div>
+              {localSummary.length > 160 && (
+                <button
+                  type="button"
+                  onClick={() => openSummaryOverlay()}
+                  style={{
+                    marginTop: 4,
+                    fontSize: 11,
+                    color: "#0369a1",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
+                >
+                  Expand
+                </button>
+              )}
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: 8,
+                borderRadius: 6,
+                border: isSummaryDragOver ? "1px dashed #0ea5e9" : "1px dashed #e5e7eb",
+                background: isSummaryDragOver ? "#f0f9ff" : "#f9fafb",
+                fontSize: 12,
+                color: "#9ca3af",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
+              <span>Drop summary text here</span>
+              <button
+                type="button"
+                onClick={() => setPasteMode(true)}
+                style={{
+                  fontSize: 11,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  border: "1px solid #cbd5f5",
+                  background: "#e0f2fe",
+                  color: "#0369a1",
+                  cursor: "pointer",
+                }}
+              >
+                Paste
+              </button>
+            </div>
+          )
+        ) : localSummary.trim() ? (
           <div
             style={{
               position: "relative",
@@ -1004,7 +1083,7 @@ function DraggableCard({
               padding: 8,
               borderRadius: 6,
               border: "1px solid #e5e7eb",
-              background: isSummaryDragOver ? "#f0f9ff" : "#f9fafb",
+              background: "#f9fafb",
             }}
           >
             <div
@@ -1036,42 +1115,8 @@ function DraggableCard({
               </button>
             )}
           </div>
-        ) : (
-          <div
-            style={{
-              padding: 8,
-              borderRadius: 6,
-              border: isSummaryDragOver ? "1px dashed #0ea5e9" : "1px dashed #e5e7eb",
-              background: isSummaryDragOver ? "#f0f9ff" : "#f9fafb",
-              fontSize: 12,
-              color: "#9ca3af",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-            }}
-          >
-            <span>Drop summary text here</span>
-            {role === "AGENCY" && (
-              <button
-                type="button"
-                onClick={() => setPasteMode(true)}
-                style={{
-                  fontSize: 11,
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  border: "1px solid #cbd5f5",
-                  background: "#e0f2fe",
-                  color: "#0369a1",
-                  cursor: "pointer",
-                }}
-              >
-                Paste
-              </button>
-            )}
-          </div>
-        )}
-        {summaryError && (
+        ) : null}
+        {role === "AGENCY" && summaryError && (
           <div style={{ marginTop: 4, fontSize: 11, color: "#b91c1c" }}>{summaryError}</div>
         )}
         {pasteMode && role === "AGENCY" && (
