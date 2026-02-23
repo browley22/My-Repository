@@ -671,7 +671,7 @@ function DraggableCard({
           ⚠ At Risk
         </div>
       )}
-      {isStaleForBadge && (
+      {isStaleForBadge && role === "CLIENT" && (
         <div
           style={{
             position: "absolute",
@@ -686,7 +686,7 @@ function DraggableCard({
             fontWeight: 600,
           }}
         >
-          {role === "CLIENT" ? "Needs your decision" : "Needs Attention"}
+          Needs your decision
         </div>
       )}
       {role !== "CLIENT" && !hasOwner && (
