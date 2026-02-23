@@ -5,6 +5,7 @@ import { PrismaClient } from "@prisma/client";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import mammoth from "mammoth";
+import { runEvaluationForSubmission } from "@/lib/runSubmissionEvaluation";
 
 const prisma = new PrismaClient();
 
@@ -148,6 +149,26 @@ export async function POST(
     } catch (err) {
       console.warn("Resume DOCX text extraction failed (upload succeeded):", err);
       warning = "Text extraction failed; file saved. Preview may be unavailable.";
+    }
+  }
+
+  // After successful resume upload + text extraction: run AI evaluation for every submission of this candidate
+  // (same scoring as "candidate added"). Only when we have resume text; never overwrite on empty/failed extraction.
+  if (resumeText && resumeText.length > 0) {
+    const submissions = await prisma.submission.findMany({
+      where: { candidateId },
+      select: { id: true },
+    });
+    for (const sub of submissions) {
+      try {
+        const evalResult = await runEvaluationForSubmission(prisma, sub.id);
+        if (!evalResult.success) {
+          console.info(`[resume-upload] Skip evaluation for submission ${sub.id}: ${evalResult.skipped}`);
+        }
+      } catch (err) {
+        console.error(`[resume-upload] Evaluation failed for submission ${sub.id}:`, err);
+        // Upload already succeeded; do not fail the response
+      }
     }
   }
 

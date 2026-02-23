@@ -3,8 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
 import { PrismaClient } from "@prisma/client";
 import { assertCanAccessSubmission } from "@/lib/submission-auth";
-import { evaluateSubmission } from "@/lib/evaluateSubmission";
-import { createEventPayload } from "@/lib/create-event";
+import { runEvaluationForSubmission } from "@/lib/runSubmissionEvaluation";
 
 const prisma = new PrismaClient();
 
@@ -40,80 +39,16 @@ export async function POST(
     return NextResponse.json({ error: message }, { status: 403 });
   }
 
-  // Load submission with candidate and requisition
-  const submission = await prisma.submission.findUnique({
-    where: { id: submissionId },
-    include: {
-      candidate: true,
-      requisition: true,
-      messages: {
-        where: { fromRole: "AGENCY" },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-      events: {
-        where: { type: "QUESTION" },
-        orderBy: { createdAt: "desc" },
-        take: 5,
-      },
-    },
-  });
+  const result = await runEvaluationForSubmission(prisma, submissionId);
 
-  if (!submission) {
+  if (!result.success) {
     return NextResponse.json(
-      { error: "Submission not found" },
-      { status: 404 }
+      { error: "Evaluation skipped", detail: result.skipped },
+      { status: 400 }
     );
   }
 
-  // Resume text: prefer extracted resumeText; fallback to summary if present
-  const resumeText =
-    submission.candidate.resumeText ??
-    (submission.candidate as { summary?: string | null }).summary ??
-    null;
-
-  // Extract job description
-  const jobDescription = submission.requisition.jobDescription || null;
-
-  // Extract recruiter notes from messages and events
-  const recruiterNotes = [
-    ...submission.messages.map((m) => m.body),
-    ...submission.events
-      .map((e) => e.note)
-      .filter((n): n is string => n !== null && n !== undefined),
-  ]
-    .filter((n) => n && n.length > 0)
-    .join("\n\n");
-
-  // Run evaluation
-  const evaluation = evaluateSubmission({
-    resumeText,
-    jobDescription,
-    recruiterNotes: recruiterNotes || undefined,
-  });
-
-  // Persist results
-  await prisma.submission.update({
-    where: { id: submissionId },
-    data: {
-      fitScore: evaluation.fitScore,
-      fitSummary: evaluation.fitSummary,
-      strengths: evaluation.strengths,
-      gaps: evaluation.gaps,
-      sellingPoints: evaluation.sellingPoints,
-      objectionsAndRebuttals: evaluation.objectionsAndRebuttals,
-      confidence: evaluation.confidence,
-      evaluatedAt: new Date(),
-      events: {
-        create: createEventPayload({
-          type: "AI_EVALUATION",
-          note: `Fit ${evaluation.fitScore}%`,
-          actorRole: "AGENCY",
-        }),
-      },
-    },
-  });
-
+  const { evaluation } = result;
   return NextResponse.json(
     {
       evaluation: {
