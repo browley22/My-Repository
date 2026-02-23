@@ -871,13 +871,11 @@ function DraggableCard({
           gap: 10,
         }}
       >
-        <button
-          type="button"
+        <div
           style={{
-            all: "unset",
-            cursor: "pointer",
             flex: 1,
             display: "block",
+            minWidth: 0,
           }}
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1214,7 +1212,7 @@ function DraggableCard({
                   </div>
                 );
               })()}
-        </button>
+        </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {(submission.candidate.resumeUrl || submission.candidate.resumeText) && (
