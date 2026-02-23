@@ -92,6 +92,7 @@ function prettyStatus(s?: string | null) {
   const displayOverrides: Record<string, string> = {
     SUBMITTED: "Submitted to AM",
     UNDER_REVIEW: "Submitted to Client",
+    OFFER_PENDING: "Interview Scheduled",
   };
   if (displayOverrides[s]) return displayOverrides[s];
   return String(s)

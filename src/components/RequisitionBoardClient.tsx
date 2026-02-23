@@ -408,6 +408,7 @@ export default function RequisitionBoardClient({
     const displayOverrides: Record<string, string> = {
       SUBMITTED: "Submitted to AM",
       UNDER_REVIEW: "Submitted to Client",
+      OFFER_PENDING: "Interview Scheduled",
     };
     if (displayOverrides[status]) return displayOverrides[status];
     return status

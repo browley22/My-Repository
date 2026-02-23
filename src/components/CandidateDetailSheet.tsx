@@ -763,7 +763,7 @@ export default function CandidateDetailSheet({
                             .replaceAll("SUBMITTED", "Submitted to AM")
                             .replaceAll("UNDER_REVIEW", "Submitted to Client")
                             .replaceAll("INTERVIEW_REQUESTED", "Interview Requested")
-                            .replaceAll("OFFER_PENDING", "Offer Pending")
+                            .replaceAll("OFFER_PENDING", "Interview Scheduled")
                             .replaceAll("OFFERED", "Offered")
                             .replaceAll("DECLINED", "Declined")
                             .replaceAll("CLOSED", "Closed")}

@@ -82,8 +82,8 @@ const columns = [
 "INTERVIEW_REQUESTED",
 "OFFER_PENDING",
 "OFFERED",
-"DECLINED",
 "CLOSED",
+"DECLINED",
 ] as const;
 
 return (
