@@ -399,7 +399,19 @@ function DraggableCard({
     [role, candidateId, onResumeUploaded]
   );
 
-  const fullName = `${submission.candidate.firstName} ${submission.candidate.lastName}`;
+  const [localFirstName, setLocalFirstName] = React.useState(
+    submission.candidate.firstName ?? ""
+  );
+  const [localLastName, setLocalLastName] = React.useState(
+    submission.candidate.lastName ?? ""
+  );
+  const fullName = `${localFirstName} ${localLastName}`.trim() || "—";
+
+  const [isNameEditing, setIsNameEditing] = React.useState(false);
+  const [editFirstName, setEditFirstName] = React.useState("");
+  const [editLastName, setEditLastName] = React.useState("");
+  const [nameSaving, setNameSaving] = React.useState(false);
+  const [nameError, setNameError] = React.useState<string | null>(null);
 
   const [localSummary, setLocalSummary] = React.useState<string>(
     submission.candidate.summary ?? ""
@@ -784,6 +796,76 @@ function DraggableCard({
     setSummaryExpanded(false);
   }, []);
 
+  const startNameEdit = React.useCallback(() => {
+    if (role !== "AGENCY") return;
+    setEditFirstName(localFirstName);
+    setEditLastName(localLastName);
+    setNameError(null);
+    setIsNameEditing(true);
+  }, [role, localFirstName, localLastName]);
+
+  const cancelNameEdit = React.useCallback(() => {
+    setIsNameEditing(false);
+    setNameError(null);
+  }, []);
+
+  const saveName = React.useCallback(
+    async () => {
+      const candidateId = submission.candidate?.id ?? null;
+      if (candidateId == null || candidateId === "") {
+        setNameError("Missing candidate id.");
+        return;
+      }
+      const first = editFirstName.trim();
+      const last = editLastName.trim();
+      if (!first || !last) {
+        setNameError("First and last name are required.");
+        return;
+      }
+      setNameError(null);
+      setNameSaving(true);
+      try {
+        const res = await fetch(`/api/candidates/${candidateId}/name`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ firstName: first, lastName: last }),
+        });
+        const bodyText = await res.text();
+        let data: { error?: string; detail?: string; firstName?: string; lastName?: string } = {};
+        try {
+          if (bodyText) data = JSON.parse(bodyText) as typeof data;
+        } catch {
+          //
+        }
+        if (!res.ok) {
+          const msg = [data?.error, data?.detail].filter(Boolean).join(" — ") || `Request failed (${res.status})`;
+          setNameError(msg);
+          return;
+        }
+        setLocalFirstName(data?.firstName ?? first);
+        setLocalLastName(data?.lastName ?? last);
+        setIsNameEditing(false);
+      } catch (err) {
+        setNameError(err instanceof Error ? err.message : "Failed to save name.");
+      } finally {
+        setNameSaving(false);
+      }
+    },
+    [submission.candidate?.id, editFirstName, editLastName]
+  );
+
+  React.useEffect(() => {
+    if (isNameEditing) {
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") cancelNameEdit();
+        if (e.key === "Enter") void saveName();
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }
+    return undefined;
+  }, [isNameEditing, cancelNameEdit, saveName]);
+
   const truncatedSummary =
     localSummary && localSummary.length > 160
       ? `${localSummary.slice(0, 160)}…`
@@ -983,7 +1065,130 @@ function DraggableCard({
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 600 }}>{fullName}</span>
+              {role === "AGENCY" && isNameEditing ? (
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <input
+                      type="text"
+                      value={editFirstName}
+                      onChange={(e) => setEditFirstName(e.target.value)}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      placeholder="First name"
+                      style={{
+                        width: 100,
+                        fontSize: 12,
+                        padding: "4px 6px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 4,
+                      }}
+                      disabled={nameSaving}
+                    />
+                    <input
+                      type="text"
+                      value={editLastName}
+                      onChange={(e) => setEditLastName(e.target.value)}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      placeholder="Last name"
+                      style={{
+                        width: 100,
+                        fontSize: 12,
+                        padding: "4px 6px",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: 4,
+                      }}
+                      disabled={nameSaving}
+                    />
+                  </div>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void saveName();
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      disabled={nameSaving}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        border: "1px solid #0ea5e9",
+                        background: "#0ea5e9",
+                        color: "#fff",
+                        cursor: nameSaving ? "wait" : "pointer",
+                      }}
+                    >
+                      {nameSaving ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cancelNameEdit();
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      disabled={nameSaving}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        border: "1px solid #e5e7eb",
+                        background: "#f9fafb",
+                        color: "#4b5563",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {nameError && (
+                    <div style={{ fontSize: 11, color: "#b91c1c" }}>{nameError}</div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    flexWrap: "wrap",
+                    ...(role === "AGENCY"
+                      ? {
+                          cursor: "pointer",
+                          borderRadius: 4,
+                          padding: "2px 4px",
+                          margin: "-2px -4px",
+                        }
+                      : {}),
+                  }}
+                  {...(role === "AGENCY"
+                    ? {
+                        onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+                        onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
+                        onClick: (e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          startNameEdit();
+                        },
+                      }
+                    : {})}
+                >
+                  <span style={{ fontWeight: 600 }}>{fullName}</span>
+                  {role === "AGENCY" && (
+                    <span style={{ fontSize: 10, color: "#9ca3af" }} title="Edit name">
+                      ✎
+                    </span>
+                  )}
+                </div>
+              )}
               {rank === 1 && (
                 <span
                   style={{
