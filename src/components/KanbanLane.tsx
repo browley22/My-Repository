@@ -104,6 +104,14 @@ function prettyStatus(s?: string | null) {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function getColumnLabel(status: string, role?: "CLIENT" | "AGENCY") {
+  if (role === "CLIENT") {
+    if (status === "SUBMITTED") return "Submitted";
+    // CLIENT does not render a separate UNDER_REVIEW column; other statuses use generic label.
+  }
+  return prettyStatus(status);
+}
+
 /** Last activity time for aging: updatedAt, then lastUpdatedAt/lastMovedAt, then latest event createdAt. */
 function getLastActivityDate(submission: Submission): number {
   const sub = submission as { updatedAt?: string | null; lastUpdatedAt?: string | null; lastMovedAt?: string | null };
@@ -1036,7 +1044,7 @@ function DroppableColumn({
       }}
     >
       <h3 style={{ marginTop: 0 }}>
-        {prettyStatus(status)} ({submissions.length})
+        {getColumnLabel(status, role)} ({submissions.length})
       </h3>
       <div style={{ fontSize: 10, color: "#64748b", marginTop: 2, marginBottom: 8 }}>
         {activityLabel}
@@ -1293,7 +1301,12 @@ export default function KanbanLane({
             onToggleSelect={onToggleSelect}
             submissions={submissions
               .filter((s) => {
-                if (s.status !== status) return false;
+                if (role === "CLIENT" && status === "SUBMITTED") {
+                  // CLIENT: show both SUBMITTED and UNDER_REVIEW in the single "Submitted" column.
+                  if (s.status !== "SUBMITTED" && s.status !== "UNDER_REVIEW") return false;
+                } else {
+                  if (s.status !== status) return false;
+                }
                 if (!staleOnly) return true;
 
                 const latest = s.events

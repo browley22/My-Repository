@@ -76,15 +76,27 @@ try {
   return <div>Access denied.</div>;
 }
 
-const columns = [
-"SUBMITTED",
-"UNDER_REVIEW",
-"INTERVIEW_REQUESTED",
-"OFFER_PENDING",
-"OFFERED",
-"CLOSED",
-"DECLINED",
+const agencyColumns = [
+  "SUBMITTED",
+  "UNDER_REVIEW",
+  "INTERVIEW_REQUESTED",
+  "OFFER_PENDING",
+  "OFFERED",
+  "CLOSED",
+  "DECLINED",
 ] as const;
+
+// CLIENT: do not show a separate "Submitted to Client" column; map those submissions into "Submitted".
+const clientColumns = [
+  "SUBMITTED",
+  "INTERVIEW_REQUESTED",
+  "OFFER_PENDING",
+  "OFFERED",
+  "CLOSED",
+  "DECLINED",
+] as const;
+
+const columns = (role === "AGENCY" ? agencyColumns : clientColumns) as readonly string[];
 
 return (
 <div style={{ padding: 40 }}>
