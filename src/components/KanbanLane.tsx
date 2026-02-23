@@ -826,12 +826,16 @@ function DraggableCard({
       setNameSaving(true);
       try {
         const res = await fetch(`/api/candidates/${candidateId}/name`, {
-          method: "POST",
+          method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ firstName: first, lastName: last }),
         });
         const bodyText = await res.text();
-        let data: { error?: string; detail?: string; firstName?: string; lastName?: string } = {};
+        let data: {
+          error?: string;
+          detail?: string;
+          candidate?: { firstName?: string; lastName?: string };
+        } = {};
         try {
           if (bodyText) data = JSON.parse(bodyText) as typeof data;
         } catch {
@@ -842,8 +846,9 @@ function DraggableCard({
           setNameError(msg);
           return;
         }
-        setLocalFirstName(data?.firstName ?? first);
-        setLocalLastName(data?.lastName ?? last);
+        const c = data?.candidate;
+        setLocalFirstName(c?.firstName ?? first);
+        setLocalLastName(c?.lastName ?? last);
         setIsNameEditing(false);
       } catch (err) {
         setNameError(err instanceof Error ? err.message : "Failed to save name.");

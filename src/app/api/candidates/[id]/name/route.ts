@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 
 export const runtime = "nodejs";
 
-export async function POST(
+export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -40,34 +40,39 @@ export async function POST(
 
   const firstName = typeof body?.firstName === "string" ? body.firstName.trim() : "";
   const lastName = typeof body?.lastName === "string" ? body.lastName.trim() : "";
-  if (!firstName || !lastName) {
+  if (firstName.length < 1 || lastName.length < 1) {
     return NextResponse.json(
-      { error: "First name and last name are required" },
+      { error: "First name and last name are required (at least 1 character each)" },
       { status: 400 }
     );
   }
 
   try {
-    await prisma.candidate.update({
+    const updatedCandidate = await prisma.candidate.update({
       where: { id: candidateId },
       data: { firstName, lastName },
     });
     return NextResponse.json(
-      { ok: true, firstName, lastName },
+      { candidate: updatedCandidate },
       { status: 200 }
     );
   } catch (err) {
+    const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : undefined;
+    if (code === "P2025") {
+      return NextResponse.json(
+        { error: "Candidate not found" },
+        { status: 404 }
+      );
+    }
     const safeMessage =
       err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string"
         ? (err as { message: string }).message
         : err != null
           ? String(err)
           : "Unknown error";
-    const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : undefined;
-    const detail = code === "P2025" ? "Candidate not found." : safeMessage;
     console.error("Update candidate name failed:", err);
     return NextResponse.json(
-      { error: "Failed to update name", detail, code: code ?? undefined },
+      { error: "Failed to update name", detail: safeMessage },
       { status: 500 }
     );
   }
