@@ -670,7 +670,6 @@ function DraggableCard({
       : localSummary;
 
   return (
-    <>
     <div
       ref={(el) => {
         setNodeRef(el);
@@ -1058,6 +1057,72 @@ function DraggableCard({
         {summaryError && (
           <div style={{ marginTop: 4, fontSize: 11, color: "#b91c1c" }}>{summaryError}</div>
         )}
+        {pasteMode && role === "AGENCY" && (
+          <div
+            style={{
+              marginTop: 6,
+              padding: 8,
+              borderRadius: 6,
+              border: "1px solid #e5e7eb",
+              background: "#ffffff",
+            }}
+          >
+            <textarea
+              value={pasteValue}
+              onChange={(e) => setPasteValue(e.target.value)}
+              rows={4}
+              style={{
+                width: "100%",
+                fontSize: 12,
+                padding: 6,
+                borderRadius: 4,
+                border: "1px solid #e5e7eb",
+                resize: "vertical",
+                boxSizing: "border-box",
+              }}
+              placeholder="Paste summary text here…"
+            />
+            <div style={{ marginTop: 6, display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                onClick={() => setPasteMode(false)}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 8px",
+                  borderRadius: 4,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                  color: "#4b5563",
+                  cursor: "pointer",
+                }}
+                disabled={summarySaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!pasteValue.trim()) return;
+                  await saveSummary(pasteValue);
+                  if (!summaryError) setPasteMode(false);
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  borderRadius: 4,
+                  border: "1px solid #0ea5e9",
+                  background: "#0ea5e9",
+                  color: "#ffffff",
+                  cursor: "pointer",
+                  opacity: summarySaving ? 0.7 : 1,
+                }}
+                disabled={summarySaving || !pasteValue.trim()}
+              >
+                {summarySaving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
           <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
@@ -1286,70 +1351,6 @@ function DroppableColumn({
         />
       ))}
     </div>
-    {summaryExpanded && summaryOverlayRect &&
-      createPortal(
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            background: "rgba(15,23,42,0.45)",
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "center",
-            padding: "40px 16px",
-          }}
-          onClick={closeSummaryOverlay}
-        >
-          <div
-            style={{
-              position: "absolute",
-              top: summaryOverlayRect.top,
-              left: summaryOverlayRect.left,
-              width: summaryOverlayRect.width,
-              maxWidth: 680,
-              background: "#ffffff",
-              borderRadius: 12,
-              boxShadow: "0 20px 45px rgba(15,23,42,0.45)",
-              padding: 16,
-              zIndex: 10000,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>Summary — {fullName}</div>
-              <button
-                type="button"
-                onClick={closeSummaryOverlay}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: 18,
-                  lineHeight: 1,
-                  cursor: "pointer",
-                  color: "#64748b",
-                }}
-                aria-label="Close summary"
-              >
-                ×
-              </button>
-            </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: "#334155",
-                whiteSpace: "pre-wrap",
-                maxHeight: 320,
-                overflowY: "auto",
-              }}
-            >
-              {localSummary}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
   );
 }
 
