@@ -760,8 +760,8 @@ export default function CandidateDetailSheet({
                       {e.note && (
                         <div className="text-gray-600">
                           {e.note
-                            .replaceAll("SUBMITTED", "Submitted")
-                            .replaceAll("UNDER_REVIEW", "Under Review")
+                            .replaceAll("SUBMITTED", "Submitted to AM")
+                            .replaceAll("UNDER_REVIEW", "Submitted to Client")
                             .replaceAll("INTERVIEW_REQUESTED", "Interview Requested")
                             .replaceAll("OFFER_PENDING", "Offer Pending")
                             .replaceAll("OFFERED", "Offered")

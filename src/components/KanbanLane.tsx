@@ -89,6 +89,11 @@ const NEXT_ACTION_STYLES: Record<string, { bg: string; text: string }> = {
 
 function prettyStatus(s?: string | null) {
   if (!s) return "";
+  const displayOverrides: Record<string, string> = {
+    SUBMITTED: "Submitted to AM",
+    UNDER_REVIEW: "Submitted to Client",
+  };
+  if (displayOverrides[s]) return displayOverrides[s];
   return String(s)
     .replaceAll("_", " ")
     .toLowerCase()

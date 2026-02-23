@@ -353,8 +353,8 @@ export default function RequisitionBoardClient({
     }
     const filterValue = best.status === "OFFER_PENDING" || best.status === "OFFERED" ? "OFFER" : best.status;
     const statusToLabel: Record<string, string> = {
-      SUBMITTED: "Submitted",
-      UNDER_REVIEW: "Under Review",
+      SUBMITTED: "Submitted to AM",
+      UNDER_REVIEW: "Submitted to Client",
       INTERVIEW_REQUESTED: "Interview",
       OFFER_PENDING: "Offer",
       OFFERED: "Offer",
@@ -405,6 +405,11 @@ export default function RequisitionBoardClient({
   }, [submissions]);
 
   const formatStatusLabel = (status: string) => {
+    const displayOverrides: Record<string, string> = {
+      SUBMITTED: "Submitted to AM",
+      UNDER_REVIEW: "Submitted to Client",
+    };
+    if (displayOverrides[status]) return displayOverrides[status];
     return status
       .replaceAll("_", " ")
       .toLowerCase()
@@ -2012,8 +2017,8 @@ export default function RequisitionBoardClient({
             <span style={{ color: "#64748b" }}>Status</span>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} style={{ padding: "4px 8px", fontSize: 12, border: "1px solid #e2e8f0", borderRadius: 6, background: "#fff", color: "#334155" }}>
               <option value="ALL">All</option>
-              <option value="SUBMITTED">Submitted</option>
-              <option value="UNDER_REVIEW">Under Review</option>
+              <option value="SUBMITTED">Submitted to AM</option>
+              <option value="UNDER_REVIEW">Submitted to Client</option>
               <option value="INTERVIEW_REQUESTED">Interview</option>
               <option value="OFFER">Offer</option>
               <option value="CLOSED">Hired</option>
