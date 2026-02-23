@@ -38,25 +38,23 @@ export async function POST(
     );
   }
 
-  const raw = body != null && typeof body.summaryText === "string" ? body.summaryText : "";
-  const clean = raw.trim();
-  if (!clean) {
-    return NextResponse.json(
-      { error: "Missing summaryText" },
-      { status: 400 }
-    );
-  }
+  const summaryText = body?.summaryText;
+  const clean = String(summaryText ?? "").trim();
   if (clean.length < 20) {
     return NextResponse.json(
-      { error: "Summary too short", detail: "Minimum 20 characters required." },
+      { error: "Summary is empty/too short", detail: "Minimum 20 characters required." },
       { status: 400 }
     );
   }
 
+  const updateData: { candidateSummaryText: string } = {
+    candidateSummaryText: clean,
+  };
+
   try {
     const updated = await prisma.candidate.update({
       where: { id: candidateId },
-      data: { candidateSummaryText: clean },
+      data: updateData,
       select: { id: true, candidateSummaryText: true },
     });
     return NextResponse.json(

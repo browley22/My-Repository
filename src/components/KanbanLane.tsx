@@ -641,16 +641,9 @@ function DraggableCard({
       e.stopPropagation();
       setIsSummaryDragOver(false);
       const dt = e.dataTransfer;
-      const text =
-        (dt?.getData("text/plain") ?? "") ||
-        (dt?.getData("Text") ?? "") ||
-        "";
+      const text = (dt?.getData("text/plain") || dt?.getData("Text") || "") as string;
       const summaryText = text.trim();
-      if (!summaryText) {
-        setSummaryError("No text received. Drop or paste at least 20 characters.");
-        return;
-      }
-      if (summaryText.length < 20) {
+      if (!summaryText || summaryText.length < 20) {
         setSummaryError("Summary too short. Minimum 20 characters.");
         return;
       }
