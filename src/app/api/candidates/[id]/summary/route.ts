@@ -54,13 +54,21 @@ export async function POST(
       select: { id: true, candidateSummaryText: true },
     });
     return NextResponse.json(
-      { candidateId: updated.id, summaryText: updated.candidateSummaryText },
+      { ok: true, candidateId: updated.id, summaryText: updated.candidateSummaryText ?? summaryText },
       { status: 200 }
     );
   } catch (err) {
+    const safeMessage =
+      err && typeof err === "object" && "message" in err && typeof (err as { message: unknown }).message === "string"
+        ? (err as { message: string }).message
+        : err != null
+          ? String(err)
+          : "Unknown error";
+    const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : undefined;
+    const detail = code === "P2025" ? "Candidate not found." : safeMessage;
     console.error("Update candidate summary failed:", err);
     return NextResponse.json(
-      { error: "Failed to update candidate summary" },
+      { error: "Failed to update candidate summary", detail, code: code ?? undefined },
       { status: 500 }
     );
   }

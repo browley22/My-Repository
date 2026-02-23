@@ -593,19 +593,27 @@ function DraggableCard({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ summaryText: trimmed }),
         });
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({})) as { error?: string; detail?: string; summaryText?: string; ok?: boolean };
         if (!res.ok) {
-          const msg = (data && (data.error || data.detail)) || "Failed to save summary.";
-          setSummaryError(String(msg));
-          console.log("[Summary save] failed", { status: res.status, data });
+          const parts = [data?.error, data?.detail].filter(Boolean);
+          const msg = parts.length > 0 ? parts.join(" — ") : `Request failed (${res.status})`;
+          setSummaryError(msg);
+          if (process.env.NODE_ENV === "development") {
+            console.error("[Summary save] failed", { status: res.status, statusText: res.statusText, body: data });
+          }
           return;
         }
-        setLocalSummary(trimmed);
-        console.log("[Summary save] success", { candidateId, summaryText: (data as { summaryText?: string }).summaryText });
+        const savedText = data?.summaryText ?? trimmed;
+        setLocalSummary(savedText);
+        if (process.env.NODE_ENV === "development") {
+          console.log("[Summary save] success", { candidateId, summaryText: savedText });
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to save summary.";
         setSummaryError(msg);
-        console.log("[Summary save] error", err);
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Summary save] error", err);
+        }
       } finally {
         setSummarySaving(false);
       }
