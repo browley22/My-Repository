@@ -21,7 +21,7 @@ export async function POST(
   }
 
   const candidateId = params?.id;
-  if (!candidateId) {
+  if (!candidateId || typeof candidateId !== "string") {
     return NextResponse.json(
       { error: "Missing candidateId" },
       { status: 400 }
@@ -40,24 +40,23 @@ export async function POST(
 
   const summaryText = body?.summaryText;
   const clean = String(summaryText ?? "").trim();
-  if (clean.length < 20) {
+  if (!clean || clean.length < 20) {
     return NextResponse.json(
       { error: "Summary is empty/too short", detail: "Minimum 20 characters required." },
       { status: 400 }
     );
   }
-  if (!clean || clean.length < 20) {
-    throw new Error("Summary is empty/too short");
-  }
 
   try {
-    const updated = await prisma.candidate.update({
+    await prisma.candidate.update({
       where: { id: candidateId },
-      data: { candidateSummaryText: clean },
-      select: { id: true, candidateSummaryText: true },
+      data: {
+        candidateSummaryText: clean,
+        candidateSummaryUpdatedAt: new Date(),
+      },
     });
     return NextResponse.json(
-      { ok: true, candidateId: updated.id, summaryText: updated.candidateSummaryText ?? clean },
+      { ok: true, summaryText: clean },
       { status: 200 }
     );
   } catch (err) {
@@ -76,4 +75,3 @@ export async function POST(
     );
   }
 }
-
