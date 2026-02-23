@@ -23,12 +23,12 @@ export async function POST(
   const candidateId = params?.id;
   if (!candidateId) {
     return NextResponse.json(
-      { error: "Missing candidate id" },
+      { error: "Missing candidateId" },
       { status: 400 }
     );
   }
 
-  let body: { summaryText?: string };
+  let body: { summaryText?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -38,9 +38,15 @@ export async function POST(
     );
   }
 
-  const raw = typeof body.summaryText === "string" ? body.summaryText : "";
-  const summaryText = raw.trim();
-  if (!summaryText || summaryText.length < 20) {
+  const raw = body != null && typeof body.summaryText === "string" ? body.summaryText : "";
+  const clean = raw.trim();
+  if (!clean) {
+    return NextResponse.json(
+      { error: "Missing summaryText" },
+      { status: 400 }
+    );
+  }
+  if (clean.length < 20) {
     return NextResponse.json(
       { error: "Summary too short", detail: "Minimum 20 characters required." },
       { status: 400 }
@@ -50,11 +56,11 @@ export async function POST(
   try {
     const updated = await prisma.candidate.update({
       where: { id: candidateId },
-      data: { candidateSummaryText: summaryText },
+      data: { candidateSummaryText: clean },
       select: { id: true, candidateSummaryText: true },
     });
     return NextResponse.json(
-      { ok: true, candidateId: updated.id, summaryText: updated.candidateSummaryText ?? summaryText },
+      { ok: true, candidateId: updated.id, summaryText: updated.candidateSummaryText ?? clean },
       { status: 200 }
     );
   } catch (err) {

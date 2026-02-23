@@ -572,26 +572,24 @@ function DraggableCard({
 
   const saveSummary = React.useCallback(
     async (text: string) => {
-      const candidateId = submission.candidate.id;
+      const candidateId = submission.candidate?.id ?? null;
       if (!candidateId) {
         setSummaryError("Missing candidate id; cannot save summary.");
-        console.log("[Summary save] skipped: missing candidateId");
         return;
       }
-      const trimmed = text.trim();
-      if (trimmed.length < 20) {
+      const summaryText = typeof text === "string" ? text.trim() : "";
+      if (!summaryText || summaryText.length < 20) {
         setSummaryError("Summary too short. Minimum 20 characters.");
         return;
       }
       setSummaryError(null);
       setSummarySaving(true);
       const url = `/api/candidates/${candidateId}/summary`;
-      console.log("[Summary save] calling API", { candidateId, url, summaryLength: trimmed.length });
       try {
         const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ summaryText: trimmed }),
+          body: JSON.stringify({ summaryText }),
         });
         const data = await res.json().catch(() => ({})) as { error?: string; detail?: string; summaryText?: string; ok?: boolean };
         if (!res.ok) {
@@ -603,11 +601,8 @@ function DraggableCard({
           }
           return;
         }
-        const savedText = data?.summaryText ?? trimmed;
+        const savedText = data?.summaryText ?? summaryText;
         setLocalSummary(savedText);
-        if (process.env.NODE_ENV === "development") {
-          console.log("[Summary save] success", { candidateId, summaryText: savedText });
-        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to save summary.";
         setSummaryError(msg);
@@ -646,27 +641,22 @@ function DraggableCard({
       e.stopPropagation();
       setIsSummaryDragOver(false);
       const dt = e.dataTransfer;
-      const types = dt ? Array.from(dt.types) : [];
       const text =
-        dt?.getData("text/plain") ||
-        dt?.getData("Text") ||
+        (dt?.getData("text/plain") ?? "") ||
+        (dt?.getData("Text") ?? "") ||
         "";
-      // [DEBUG] Summary drop – remove after verifying persistence
-      const candidateId = submission.candidate?.id ?? null;
-      const submissionId = submission.id ?? null;
-      console.log("[Summary drop]", {
-        dataTransferTypes: types,
-        extractedTextLength: text.length,
-        candidateId,
-        submissionId,
-      });
-      if (!text || text.trim().length < 20) {
+      const summaryText = text.trim();
+      if (!summaryText) {
+        setSummaryError("No text received. Drop or paste at least 20 characters.");
+        return;
+      }
+      if (summaryText.length < 20) {
         setSummaryError("Summary too short. Minimum 20 characters.");
         return;
       }
-      await saveSummary(text);
+      await saveSummary(summaryText);
     },
-    [role, saveSummary, submission.candidate?.id, submission.id]
+    [role, saveSummary]
   );
 
   const openSummaryOverlay = React.useCallback(() => {
