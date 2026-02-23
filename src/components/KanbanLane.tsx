@@ -183,6 +183,108 @@ function getFirstFile(e: React.DragEvent): File | null {
   return e.dataTransfer?.files?.length ? e.dataTransfer.files[0] : null;
 }
 
+function SummaryOverlayPortal({
+  fullText,
+  overlayRect,
+  onClose,
+}: {
+  fullText: string;
+  overlayRect: { top: number; left: number; width: number } | null;
+  onClose: () => void;
+}) {
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 680;
+  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 400;
+  const width = overlayRect?.width ?? Math.min(680, viewportWidth - 40);
+  const left = overlayRect?.left ?? Math.max(20, (viewportWidth - width) / 2);
+  const top = overlayRect?.top ?? Math.max(20, (viewportHeight - 320) / 2);
+
+  return (
+    <>
+      <div
+        role="presentation"
+        aria-hidden
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 50,
+          background: "rgba(0,0,0,0.35)",
+        }}
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-label="Summary"
+        style={{
+          position: "fixed",
+          left,
+          top,
+          width,
+          maxHeight: "80vh",
+          overflow: "auto",
+          background: "#fff",
+          borderRadius: 8,
+          boxShadow: "0 12px 40px rgba(0,0,0,0.2)",
+          zIndex: 51,
+          padding: 16,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <span style={{ fontWeight: 600, fontSize: 14 }}>Summary</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                fontSize: 12,
+                color: "#0369a1",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              Collapse
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                width: 28,
+                height: 28,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                border: "1px solid #e5e7eb",
+                borderRadius: 6,
+                background: "#f9fafb",
+                cursor: "pointer",
+                fontSize: 18,
+                lineHeight: 1,
+                color: "#6b7280",
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: "#374151",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          {fullText || "—"}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function DraggableCard({
   submission,
   rank,
@@ -665,16 +767,15 @@ function DraggableCard({
   const openSummaryOverlay = React.useCallback(() => {
     if (!cardRef.current) {
       setSummaryExpanded(true);
+      setSummaryOverlayRect(null);
       return;
     }
     const rect = cardRef.current.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
     const width = Math.min(680, viewportWidth - 40);
-    const left = Math.max(
-      20,
-      Math.min(rect.left + window.scrollX, viewportWidth - 20 - width)
-    );
-    const top = rect.top + window.scrollY;
+    const left = Math.max(20, Math.min(rect.left, viewportWidth - 20 - width));
+    const top = Math.max(20, Math.min(rect.top, viewportHeight - 20 - 320));
     setSummaryOverlayRect({ top, left, width });
     setSummaryExpanded(true);
   }, []);
@@ -689,6 +790,7 @@ function DraggableCard({
       : localSummary;
 
   return (
+    <>
     <div
       ref={(el) => {
         setNodeRef(el);
@@ -1026,7 +1128,12 @@ function DraggableCard({
               {localSummary.length > 160 && (
                 <button
                   type="button"
-                  onClick={() => openSummaryOverlay()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openSummaryOverlay();
+                  }}
                   style={{
                     marginTop: 4,
                     fontSize: 11,
@@ -1100,7 +1207,12 @@ function DraggableCard({
             {localSummary.length > 160 && (
               <button
                 type="button"
-                onClick={() => openSummaryOverlay()}
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openSummaryOverlay();
+                }}
                 style={{
                   marginTop: 4,
                   fontSize: 11,
@@ -1310,6 +1422,17 @@ function DraggableCard({
         </div>
       </div>
     </div>
+    {summaryExpanded &&
+      typeof document !== "undefined" &&
+      createPortal(
+        <SummaryOverlayPortal
+          fullText={localSummary}
+          overlayRect={summaryOverlayRect}
+          onClose={closeSummaryOverlay}
+        />,
+        document.body
+      )}
+    </>
   );
 }
 
