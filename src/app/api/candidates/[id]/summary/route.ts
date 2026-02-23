@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../auth/[...nextauth]/route";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -53,7 +53,7 @@ export async function POST(
       data: {
         candidateSummaryText: clean,
         candidateSummaryUpdatedAt: new Date(),
-      },
+      } as Prisma.CandidateUpdateInput,
     });
     return NextResponse.json(
       { ok: true, summaryText: clean },
