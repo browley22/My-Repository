@@ -595,10 +595,12 @@ export default function CandidateDetailSheet({
               Status: <span className="font-medium">{submission.status}</span>
             </p>
             )}
-            <div className="flex items-center justify-between mt-2">
-              <h3 className="text-sm font-semibold text-gray-700">Owner</h3>
+            <div className="w-full flex items-center justify-between mt-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-gray-700">Owner</h3>
+              </div>
               {role === "AGENCY" && onSetOwner && (
-                <div className="flex items-center gap-2">
+                <div className="shrink-0 flex items-center gap-2">
                   <input
                     type="text"
                     value={ownerInput}
