@@ -412,6 +412,8 @@ function DraggableCard({
   const [editLastName, setEditLastName] = React.useState("");
   const [nameSaving, setNameSaving] = React.useState(false);
   const [nameError, setNameError] = React.useState<string | null>(null);
+  const nameEditStartRef = React.useRef<{ first: string; last: string } | null>(null);
+  const nameEditorRef = React.useRef<HTMLDivElement | null>(null);
 
   const [localSummary, setLocalSummary] = React.useState<string>(
     submission.candidate.summary ?? ""
@@ -800,6 +802,7 @@ function DraggableCard({
     if (role !== "AGENCY") return;
     setEditFirstName(localFirstName);
     setEditLastName(localLastName);
+    nameEditStartRef.current = { first: localFirstName, last: localLastName };
     setNameError(null);
     setIsNameEditing(true);
   }, [role, localFirstName, localLastName]);
@@ -807,6 +810,7 @@ function DraggableCard({
   const cancelNameEdit = React.useCallback(() => {
     setIsNameEditing(false);
     setNameError(null);
+    nameEditStartRef.current = null;
   }, []);
 
   const saveName = React.useCallback(
@@ -823,6 +827,11 @@ function DraggableCard({
         return;
       }
       setNameError(null);
+      const prevFirst = localFirstName;
+      const prevLast = localLastName;
+      setLocalFirstName(first);
+      setLocalLastName(last);
+      setIsNameEditing(false);
       setNameSaving(true);
       try {
         const res = await fetch(`/api/candidates/${candidateId}/name`, {
@@ -842,22 +851,48 @@ function DraggableCard({
           //
         }
         if (!res.ok) {
+          setLocalFirstName(prevFirst);
+          setLocalLastName(prevLast);
           const msg = [data?.error, data?.detail].filter(Boolean).join(" — ") || `Request failed (${res.status})`;
           setNameError(msg);
           return;
         }
         const c = data?.candidate;
-        setLocalFirstName(c?.firstName ?? first);
-        setLocalLastName(c?.lastName ?? last);
-        setIsNameEditing(false);
+        if (c?.firstName != null) setLocalFirstName(c.firstName);
+        if (c?.lastName != null) setLocalLastName(c.lastName);
       } catch (err) {
+        setLocalFirstName(prevFirst);
+        setLocalLastName(prevLast);
         setNameError(err instanceof Error ? err.message : "Failed to save name.");
       } finally {
         setNameSaving(false);
       }
     },
-    [submission.candidate?.id, editFirstName, editLastName]
+    [submission.candidate?.id, editFirstName, editLastName, localFirstName, localLastName]
   );
+
+  const handleNameEditBlur = React.useCallback(() => {
+    if (nameSaving || role !== "AGENCY") return;
+    if (nameEditorRef.current?.contains(document.activeElement)) return;
+    const first = editFirstName.trim();
+    const last = editLastName.trim();
+    const start = nameEditStartRef.current;
+    if (!start) return;
+    const changed = first !== start.first || last !== start.last;
+    if (!changed) {
+      cancelNameEdit();
+      return;
+    }
+    if (!first || !last) {
+      cancelNameEdit();
+      return;
+    }
+    void saveName();
+  }, [nameSaving, role, editFirstName, editLastName, cancelNameEdit, saveName]);
+
+  const scheduleBlurCheck = React.useCallback(() => {
+    setTimeout(() => handleNameEditBlur(), 0);
+  }, [handleNameEditBlur]);
 
   React.useEffect(() => {
     if (isNameEditing) {
@@ -1072,6 +1107,7 @@ function DraggableCard({
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {role === "AGENCY" && isNameEditing ? (
                 <div
+                  ref={nameEditorRef}
                   style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
@@ -1082,6 +1118,7 @@ function DraggableCard({
                       type="text"
                       value={editFirstName}
                       onChange={(e) => setEditFirstName(e.target.value)}
+                      onBlur={scheduleBlurCheck}
                       onPointerDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       placeholder="First name"
@@ -1098,6 +1135,7 @@ function DraggableCard({
                       type="text"
                       value={editLastName}
                       onChange={(e) => setEditLastName(e.target.value)}
+                      onBlur={scheduleBlurCheck}
                       onPointerDown={(e) => e.stopPropagation()}
                       onMouseDown={(e) => e.stopPropagation()}
                       placeholder="Last name"
@@ -1243,6 +1281,9 @@ function DraggableCard({
                 </span>
               )}
             </div>
+            {nameError && !isNameEditing && (
+              <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 2 }}>{nameError}</div>
+            )}
             <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 400 }}>
               {rank != null ? `AI Match Rank #${rank}` : "AI Match Rank"}
             </div>

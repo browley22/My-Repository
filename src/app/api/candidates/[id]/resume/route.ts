@@ -6,6 +6,7 @@ import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import mammoth from "mammoth";
 import { runEvaluationForSubmission } from "@/lib/runSubmissionEvaluation";
+import { applyContactFromResumeText } from "@/lib/parseContactFromResume";
 
 const prisma = new PrismaClient();
 
@@ -145,6 +146,11 @@ export async function POST(
           where: { id: candidateId },
           data: { resumeText, resumeTextUpdatedAt: new Date() },
         });
+        try {
+          await applyContactFromResumeText(prisma, candidateId, text);
+        } catch (err) {
+          console.warn("Resume upload contact auto-fill failed:", err);
+        }
       }
     } catch (err) {
       console.warn("Resume DOCX text extraction failed (upload succeeded):", err);
@@ -152,27 +158,52 @@ export async function POST(
     }
   }
 
-  // After successful resume upload + text extraction: run AI evaluation for every submission of this candidate
-  // (same scoring as "candidate added"). Only when we have resume text; never overwrite on empty/failed extraction.
-  if (resumeText && resumeText.length > 0) {
-    const submissions = await prisma.submission.findMany({
-      where: { candidateId },
-      select: { id: true },
-    });
+  // After successful resume upload + text extraction: run AI evaluation for every submission of this candidate.
+  const submissions = await prisma.submission.findMany({
+    where: { candidateId },
+    select: { id: true },
+  });
+  const submissionCount = submissions.length;
+  let evaluation: {
+    submissionCount: number;
+    evaluatedCount: number;
+    evaluatedSubmissionIds: string[];
+    errors?: { submissionId: string; message: string }[];
+    reason?: string;
+  } = {
+    submissionCount,
+    evaluatedCount: 0,
+    evaluatedSubmissionIds: [],
+  };
+
+  if (!resumeText || resumeText.length === 0) {
+    evaluation.reason = "empty_resume_text";
+  } else {
+    const errors: { submissionId: string; message: string }[] = [];
     for (const sub of submissions) {
       try {
         const evalResult = await runEvaluationForSubmission(prisma, sub.id);
-        if (!evalResult.success) {
+        if (evalResult.success) {
+          evaluation.evaluatedSubmissionIds.push(sub.id);
+        } else {
           console.info(`[resume-upload] Skip evaluation for submission ${sub.id}: ${evalResult.skipped}`);
         }
       } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
         console.error(`[resume-upload] Evaluation failed for submission ${sub.id}:`, err);
-        // Upload already succeeded; do not fail the response
+        errors.push({ submissionId: sub.id, message });
       }
     }
+    evaluation.evaluatedCount = evaluation.evaluatedSubmissionIds.length;
+    if (errors.length > 0) evaluation.errors = errors;
   }
 
-  const payload: { resumeUrl: string; resumeText?: string | null; warning?: string } = { resumeUrl };
+  const payload: {
+    resumeUrl: string;
+    resumeText?: string | null;
+    warning?: string;
+    evaluation: typeof evaluation;
+  } = { resumeUrl, evaluation };
   if (resumeText != null) payload.resumeText = resumeText;
   if (warning) payload.warning = warning;
   return NextResponse.json(payload, { status: 200 });

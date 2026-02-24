@@ -17,6 +17,7 @@ type CandidateLike = {
   location?: string | null;
   email?: string | null;
   phone?: string | null;
+  linkedinUrl?: string | null;
   summary?: string | null;
   resumeUrl?: string | null;
   resumeText?: string | null;
