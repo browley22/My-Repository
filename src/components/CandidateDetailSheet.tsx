@@ -437,11 +437,13 @@ export default function CandidateDetailSheet({
             <h2 className="text-xl font-semibold">{name}</h2>
             <p className="text-sm text-gray-500">{subtitle}</p>
             <section className="mt-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">Contact Information TEST</h3>
+              <div className="w-full flex items-center justify-between">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-gray-700">Contact Information TEST</h3>
+                </div>
                 {role === "AGENCY" && (
                   <div
-                    className="flex items-center gap-2"
+                    className="shrink-0 flex items-center gap-2"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
@@ -647,9 +649,11 @@ export default function CandidateDetailSheet({
           {/* AI Fit - AGENCY only */}
           {role === "AGENCY" && (
           <section>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-semibold text-gray-700">AI Fit</h3>
-              <div className="flex items-center gap-2">
+            <div className="w-full flex items-center justify-between mb-2">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-gray-700">AI Fit</h3>
+              </div>
+              <div className="shrink-0 flex items-center gap-2">
               {(!submission?.evaluatedAt && !localEvaluation) ? (
                 <button
                   type="button"
