@@ -5,6 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { readFile } from "fs/promises";
 import path from "path";
 import mammoth from "mammoth";
+import { runEvaluationForSubmission } from "@/lib/runSubmissionEvaluation";
+import { applyContactFromResumeText } from "@/lib/parseContactFromResume";
 
 const prisma = new PrismaClient();
 
@@ -97,8 +99,61 @@ export async function POST(
     );
   }
 
+  if (text.length > 0) {
+    try {
+      await applyContactFromResumeText(prisma, candidateId, text);
+    } catch (err) {
+      console.warn("Resume extract contact auto-fill failed:", err);
+    }
+  }
+
+  // Auto-run AI evaluation for every submission of this candidate when resume text was saved.
+  const submissions = await prisma.submission.findMany({
+    where: { candidateId },
+    select: { id: true },
+  });
+  const submissionCount = submissions.length;
+  let evaluation: {
+    submissionCount: number;
+    evaluatedCount: number;
+    evaluatedSubmissionIds: string[];
+    errors?: { submissionId: string; message: string }[];
+    reason?: string;
+  } = {
+    submissionCount,
+    evaluatedCount: 0,
+    evaluatedSubmissionIds: [],
+  };
+
+  if (text.length === 0) {
+    evaluation.reason = "empty_resume_text";
+  } else {
+    const errors: { submissionId: string; message: string }[] = [];
+    for (const sub of submissions) {
+      try {
+        const evalResult = await runEvaluationForSubmission(prisma, sub.id);
+        if (evalResult.success) {
+          evaluation.evaluatedSubmissionIds.push(sub.id);
+        } else {
+          console.info(`[resume-extract] Skip evaluation for submission ${sub.id}: ${evalResult.skipped}`);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[resume-extract] Evaluation failed for submission ${sub.id}:`, err);
+        errors.push({ submissionId: sub.id, message });
+      }
+    }
+    evaluation.evaluatedCount = evaluation.evaluatedSubmissionIds.length;
+    if (errors.length > 0) evaluation.errors = errors;
+  }
+
   return NextResponse.json(
-    { ok: true, resumeTextLength: text.length, resumeText: text },
+    {
+      ok: true,
+      resumeTextLength: text.length,
+      resumeText: text,
+      evaluation,
+    },
     { status: 200 }
   );
 }

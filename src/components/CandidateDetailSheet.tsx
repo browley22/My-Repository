@@ -32,6 +32,7 @@ type CandidateLike = {
   location?: string | null;
   email?: string | null;
   phone?: string | null;
+  linkedinUrl?: string | null;
   summary?: string | null;
   resumeUrl?: string | null;
   resumeText?: string | null;
@@ -103,11 +104,12 @@ export default function CandidateDetailSheet({
   const [note, setNote] = React.useState("");
   const [ownerInput, setOwnerInput] = React.useState("");
   const [busy, setBusy] = React.useState<null | "interview" | "decline" | "feedback" | "evaluate">(null);
-  const [activeTab, setActiveTab] = React.useState<"WRITEUP" | "RESUME" | "YOUR_DECISION">("WRITEUP");
+  const [activeTab, setActiveTab] = React.useState<"WRITEUP" | "RESUME" | "YOUR_DECISION">("RESUME");
   const [feedbackModalOpen, setFeedbackModalOpen] = React.useState(false);
   const [feedbackModalText, setFeedbackModalText] = React.useState("");
   const [feedbackSuccess, setFeedbackSuccess] = React.useState(false);
   const [evaluationLoading, setEvaluationLoading] = React.useState(false);
+  const [evaluationError, setEvaluationError] = React.useState<string | null>(null);
   const [localEvaluation, setLocalEvaluation] = React.useState<{
     fitScore: number;
     fitSummary: string | null;
@@ -133,8 +135,14 @@ export default function CandidateDetailSheet({
   const [localResumeUrl, setLocalResumeUrl] = React.useState<string | null>(null);
   const [activityExpanded, setActivityExpanded] = React.useState(false);
   const [messagesExpanded, setMessagesExpanded] = React.useState(false);
+  const [contactEditing, setContactEditing] = React.useState(false);
+  const [contactSaveLoading, setContactSaveLoading] = React.useState(false);
+  const [contactError, setContactError] = React.useState<string | null>(null);
+  const [localContact, setLocalContact] = React.useState<{ email: string; phone: string; linkedinUrl: string; location: string } | null>(null);
+  const [contactForm, setContactForm] = React.useState({ email: "", phone: "", linkedinUrl: "", location: "" });
   const resumeInputRef = React.useRef<HTMLInputElement>(null);
   const dropInFlightRef = React.useRef(false);
+  const autoEvalAttemptedRef = React.useRef<Set<string>>(new Set());
 
   const effectiveCandidateId = submission?.candidate?.id ?? candidateId ?? null;
   const initialResumeUrl = submission?.candidate?.resumeUrl ?? null;
@@ -144,6 +152,46 @@ export default function CandidateDetailSheet({
   const hasResume = !!effectiveResumeUrl || !!(typeof submission?.candidate?.resumeText === "string" && submission.candidate.resumeText.trim());
 
   React.useEffect(() => setLocalResumeUrl(null), [effectiveCandidateId]);
+  React.useEffect(() => {
+    setLocalContact(null);
+    setContactEditing(false);
+    setContactError(null);
+  }, [effectiveCandidateId]);
+
+  // Auto-evaluate when sheet opens for AGENCY if fitScore is missing and we have resume text (at most once per submission per page load).
+  React.useEffect(() => {
+    if (role !== "AGENCY" || !open || !submission?.id) return;
+    const hasScore = submission.fitScore != null || localEvaluation != null;
+    if (hasScore) return;
+    const resumeText = submission?.candidate?.resumeText ?? submission?.candidate?.summary ?? null;
+    const hasResumeText = typeof resumeText === "string" && resumeText.trim().length > 0;
+    if (!hasResumeText) return;
+    if (autoEvalAttemptedRef.current.has(submission.id)) return;
+    autoEvalAttemptedRef.current.add(submission.id);
+    setEvaluationError(null);
+    setEvaluationLoading(true);
+    setBusy("evaluate");
+    (async () => {
+      try {
+        const res = await fetch(`/api/submissions/${submission.id}/evaluate`, { method: "POST" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          setEvaluationError((data as { error?: string; detail?: string }).error ?? (data as { error?: string; detail?: string }).detail ?? "Evaluation failed");
+          return;
+        }
+        const data = await res.json() as { evaluation?: typeof localEvaluation };
+        if (data.evaluation) {
+          setLocalEvaluation(data.evaluation);
+          router.refresh();
+        }
+      } catch {
+        setEvaluationError("Evaluation failed");
+      } finally {
+        setEvaluationLoading(false);
+        setBusy(null);
+      }
+    })();
+  }, [open, submission?.id, submission?.fitScore, submission?.candidate?.resumeText, submission?.candidate?.summary, role, localEvaluation]);
 
   const activity = React.useMemo(() => {
     if (!submission?.events?.length) return [];
@@ -253,7 +301,7 @@ export default function CandidateDetailSheet({
 
   // CLIENT: no "Your Decision" tab in popover; decisions live on card dropdown. Avoid broken state if activeTab is YOUR_DECISION.
   React.useEffect(() => {
-    if (role === "CLIENT" && activeTab === "YOUR_DECISION") setActiveTab("WRITEUP");
+    if (role === "CLIENT" && activeTab === "YOUR_DECISION") setActiveTab("RESUME");
   }, [role, activeTab]);
 
   // AGENCY: no Resume tab in panel; ensure we don't stay on RESUME.
@@ -388,59 +436,198 @@ export default function CandidateDetailSheet({
           <div>
             <h2 className="text-xl font-semibold">{name}</h2>
             <p className="text-sm text-gray-500">{subtitle}</p>
-            <div className="mt-1 text-xs text-gray-500 space-y-0.5">
-              {c?.email && <div>Email: {c.email}</div>}
-              {c?.phone && <div>Phone: {c.phone}</div>}
-              {!c?.email && !c?.phone && <div>No contact info</div>}
-            </div>
+            <section className="mt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Contact Information TEST</h3>
+                {role === "AGENCY" && (
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                  >
+                    {!contactEditing ? (
+                      <button
+                        type="button"
+                        className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setContactForm({
+                            email: (localContact?.email ?? c?.email ?? "").trim(),
+                            phone: (localContact?.phone ?? c?.phone ?? "").trim(),
+                            linkedinUrl: (localContact?.linkedinUrl ?? c?.linkedinUrl ?? "").trim(),
+                            location: (localContact?.location ?? c?.location ?? "").trim(),
+                          });
+                          setContactError(null);
+                          setContactEditing(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+                          disabled={contactSaveLoading}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (!effectiveCandidateId) return;
+                            setContactError(null);
+                            setContactSaveLoading(true);
+                            try {
+                              const res = await fetch(`/api/candidates/${effectiveCandidateId}/contact`, {
+                                method: "PATCH",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  email: contactForm.email.trim() || null,
+                                  phone: contactForm.phone.trim() || null,
+                                  linkedinUrl: contactForm.linkedinUrl.trim() || null,
+                                  location: contactForm.location.trim() || null,
+                                }),
+                              });
+                              const data = await res.json().catch(() => ({}));
+                              if (!res.ok) {
+                                setContactError((data as { error?: string }).error ?? "Failed to save");
+                                return;
+                              }
+                              const cand = (data as { candidate?: { email?: string | null; phone?: string | null; linkedinUrl?: string | null; location?: string | null } }).candidate;
+                              if (cand) {
+                                setLocalContact({
+                                  email: cand.email ?? "",
+                                  phone: cand.phone ?? "",
+                                  linkedinUrl: cand.linkedinUrl ?? "",
+                                  location: cand.location ?? "",
+                                });
+                              }
+                              setContactEditing(false);
+                              router.refresh();
+                            } catch {
+                              setContactError("Failed to save");
+                            } finally {
+                              setContactSaveLoading(false);
+                            }
+                          }}
+                        >
+                          {contactSaveLoading ? "Saving…" : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+                          disabled={contactSaveLoading}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setContactEditing(false);
+                            setContactError(null);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 space-y-2 text-xs text-gray-500" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+                {role === "AGENCY" && contactEditing ? (
+                  <>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Location</label>
+                      <input
+                        type="text"
+                        value={contactForm.location}
+                        onChange={(e) => setContactForm((f) => ({ ...f, location: e.target.value }))}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                        placeholder="City, ST"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Email</label>
+                      <input
+                        type="text"
+                        value={contactForm.email}
+                        onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                        placeholder="email@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">Phone</label>
+                      <input
+                        type="text"
+                        value={contactForm.phone}
+                        onChange={(e) => setContactForm((f) => ({ ...f, phone: e.target.value }))}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                        placeholder="Phone"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-0.5">LinkedIn</label>
+                      <input
+                        type="text"
+                        value={contactForm.linkedinUrl}
+                        onChange={(e) => setContactForm((f) => ({ ...f, linkedinUrl: e.target.value }))}
+                        className="w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                        placeholder="https://linkedin.com/in/..."
+                      />
+                    </div>
+                    {contactError && <p className="text-xs text-red-600">{contactError}</p>}
+                  </>
+                ) : (
+                  <>
+                    <div>📍 Location: {((localContact ?? c)?.location ?? "").trim() || "—"}</div>
+                    <div>✉️ Email: {((localContact ?? c)?.email ?? "").trim() || "—"}</div>
+                    <div>📞 Phone: {((localContact ?? c)?.phone ?? "").trim() || "—"}</div>
+                    <div>LinkedIn: {(localContact ?? c)?.linkedinUrl?.trim() ? (
+                      <a href={(localContact ?? c)?.linkedinUrl ?? ""} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline">{(localContact ?? c)?.linkedinUrl}</a>
+                    ) : (
+                      "—"
+                    )}</div>
+                  </>
+                )}
+              </div>
+            </section>
             {role !== "AGENCY" && (
             <p className="mt-2 text-sm text-gray-600">
               Status: <span className="font-medium">{submission.status}</span>
             </p>
             )}
+            <div className="flex items-center justify-between mt-2">
+              <h3 className="text-sm font-semibold text-gray-700">Owner</h3>
+              {role === "AGENCY" && onSetOwner && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={ownerInput}
+                    onChange={(e) => setOwnerInput(e.target.value)}
+                    placeholder="Set owner name"
+                    className="rounded border border-gray-300 px-2 py-1 text-sm w-40"
+                  />
+                  <button
+                    type="button"
+                    className="rounded-md border px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+                    disabled={!ownerInput.trim()}
+                    onClick={async () => {
+                      if (!ownerInput.trim()) return;
+                      await onSetOwner(submission.id, ownerInput.trim());
+                      setOwnerInput("");
+                    }}
+                  >
+                    Set
+                  </button>
+                </div>
+              )}
+            </div>
             <p className="mt-1 text-sm text-gray-600">
-              Owner: <span className="font-medium">{getSubmissionOwnerName(submission) || "—"}</span>
+              <span className="font-medium">{getSubmissionOwnerName(submission) || "—"}</span>
             </p>
-            {role === "AGENCY" && onSetOwner && (
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={ownerInput}
-                  onChange={(e) => setOwnerInput(e.target.value)}
-                  placeholder="Set owner name"
-                  className="rounded border border-gray-300 px-2 py-1 text-sm w-40"
-                />
-                <button
-                  type="button"
-                  className="rounded-md border px-2 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
-                  disabled={!ownerInput.trim()}
-                  onClick={async () => {
-                    if (!ownerInput.trim()) return;
-                    await onSetOwner(submission.id, ownerInput.trim());
-                    setOwnerInput("");
-                  }}
-                >
-                  Set
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Tabs - CLIENT: Write-up, Resume (decisions on card dropdown). AGENCY: no tabs in panel. */}
+        {/* Tabs - CLIENT: Resume only (decisions on card dropdown). AGENCY: no tabs in panel. */}
         {role === "CLIENT" && (
         <div className="border-b px-4 pt-2 flex gap-2 text-sm">
-          <button
-            type="button"
-            className={`px-3 py-1 rounded-t-md border-b-2 ${
-              activeTab === "WRITEUP"
-                ? "border-sky-500 text-sky-700 font-semibold"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setActiveTab("WRITEUP")}
-          >
-            Write-up
-          </button>
           <button
             type="button"
             className={`px-3 py-1 rounded-t-md border-b-2 ${
@@ -462,6 +649,7 @@ export default function CandidateDetailSheet({
           <section>
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-700">AI Fit</h3>
+              <div className="flex items-center gap-2">
               {(!submission?.evaluatedAt && !localEvaluation) ? (
                 <button
                   type="button"
@@ -469,6 +657,7 @@ export default function CandidateDetailSheet({
                   disabled={busy !== null || evaluationLoading}
                   onClick={async () => {
                     if (!submission?.id) return;
+                    setEvaluationError(null);
                     setEvaluationLoading(true);
                     setBusy("evaluate");
                     try {
@@ -477,14 +666,14 @@ export default function CandidateDetailSheet({
                       });
                       if (!res.ok) {
                         const data = await res.json().catch(() => ({}));
-                        alert(data.error || "Evaluation failed");
+                        setEvaluationError(data.error || "Evaluation failed");
                         return;
                       }
                       const data = await res.json();
                       setLocalEvaluation(data.evaluation);
                       router.refresh();
                     } catch (err) {
-                      alert("Evaluation failed");
+                      setEvaluationError("Evaluation failed");
                     } finally {
                       setEvaluationLoading(false);
                       setBusy(null);
@@ -500,6 +689,7 @@ export default function CandidateDetailSheet({
                   disabled={busy !== null || evaluationLoading}
                   onClick={async () => {
                     if (!submission?.id) return;
+                    setEvaluationError(null);
                     setEvaluationLoading(true);
                     setBusy("evaluate");
                     try {
@@ -508,24 +698,28 @@ export default function CandidateDetailSheet({
                       });
                       if (!res.ok) {
                         const data = await res.json().catch(() => ({}));
-                        alert(data.error || "Evaluation failed");
+                        setEvaluationError(data.error || "Evaluation failed");
                         return;
                       }
                       const data = await res.json();
                       setLocalEvaluation(data.evaluation);
                       router.refresh();
                     } catch (err) {
-                      alert("Evaluation failed");
+                      setEvaluationError("Evaluation failed");
                     } finally {
                       setEvaluationLoading(false);
                       setBusy(null);
                     }
                   }}
                 >
-                  {evaluationLoading ? "Re-evaluating..." : "Re-evaluate"}
+                  {evaluationLoading ? "Re-running..." : "Re-run AI"}
                 </button>
               )}
+              </div>
             </div>
+            {evaluationError && (
+              <p className="mb-2 text-xs text-red-600">{evaluationError}</p>
+            )}
 
             {(submission?.fitScore !== null && submission?.fitScore !== undefined) || localEvaluation ? (
               (() => {
@@ -649,23 +843,6 @@ export default function CandidateDetailSheet({
           </section>
           )}
 
-          {/* Summary */}
-          <section>
-            <h3 className="text-sm font-semibold text-gray-700">Summary</h3>
-            <button
-              type="button"
-              className={`mt-2 px-3 py-1 rounded-t-md border-b-2 text-sm ${
-                activeTab === "WRITEUP"
-                  ? "border-sky-500 text-sky-700 font-semibold"
-                  : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
-              onClick={() => setActiveTab("WRITEUP")}
-            >
-              Write-up
-            </button>
-            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-800">{c?.summary || "—"}</p>
-          </section>
-
           {/* Activity Timeline - AGENCY: last 3 by default with Show more/less; CLIENT: last 5 with Show all (n)/Show less */}
           <section>
             <h3 className="text-sm font-semibold text-gray-700">Activity</h3>
@@ -781,13 +958,6 @@ export default function CandidateDetailSheet({
 
         {activeTab === "RESUME" && role !== "AGENCY" && (
           <div className="p-4 h-[calc(100%-56px)] flex flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => setActiveTab("WRITEUP")}
-              className="self-start text-sm text-sky-600 hover:underline"
-            >
-              ← Write-up
-            </button>
             {hasResume ? (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
