@@ -1,3 +1,4 @@
+// NextAuth API route (touch to force server bundle rebuild)
 import NextAuth, { type NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import type { JWT } from "next-auth/jwt";

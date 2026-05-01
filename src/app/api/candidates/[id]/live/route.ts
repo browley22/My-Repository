@@ -7,8 +7,8 @@ const prisma = new PrismaClient();
 
 export const runtime = "nodejs";
 
-/** AGENCY-only: update candidate contact and set contactManuallyOverridden = true. */
-export async function PATCH(
+/** AGENCY-only: mark candidate LIVE/NOT LIVE for the client. */
+export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
@@ -29,7 +29,7 @@ export async function PATCH(
       );
     }
 
-    let body: { email?: unknown; phone?: unknown; linkedinUrl?: unknown; location?: unknown };
+    let body: { isLive?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -39,17 +39,12 @@ export async function PATCH(
       );
     }
 
-    const normalize = (value: unknown): string | null | undefined => {
-      if (value === undefined || value === null) return undefined;
-      if (typeof value !== "string") return undefined;
-      const trimmed = value.trim();
-      return trimmed.length === 0 ? null : trimmed;
-    };
-
-    const email = normalize(body.email);
-    const phone = normalize(body.phone);
-    const linkedinUrl = normalize(body.linkedinUrl);
-    const location = normalize(body.location);
+    if (typeof body.isLive !== "boolean") {
+      return NextResponse.json(
+        { error: "isLive must be a boolean" },
+        { status: 400 }
+      );
+    }
 
     const existing = await prisma.candidate.findUnique({
       where: { id: candidateId },
@@ -62,24 +57,36 @@ export async function PATCH(
       );
     }
 
-    const data: { email?: string | null; phone?: string | null; linkedinUrl?: string | null; location?: string | null; contactManuallyOverridden: boolean } = {
-      contactManuallyOverridden: true,
+    const isLive = body.isLive;
+    const userId = (session.user as { id?: string }).id ?? null;
+
+    const data: {
+      isLiveForClient: boolean;
+      liveAt?: Date | null;
+      liveByUserId?: string | null;
+    } = {
+      isLiveForClient: isLive,
     };
-    if (email !== undefined) data.email = email;
-    if (phone !== undefined) data.phone = phone;
-    if (linkedinUrl !== undefined) data.linkedinUrl = linkedinUrl;
-    if (location !== undefined) data.location = location;
+
+    if (isLive) {
+      data.liveAt = new Date();
+      data.liveByUserId = userId;
+    } else {
+      data.liveAt = null;
+      data.liveByUserId = null;
+    }
 
     const updatedCandidate = await prisma.candidate.update({
       where: { id: candidateId },
       data,
     });
+
     return NextResponse.json(
       { candidate: updatedCandidate },
       { status: 200 }
     );
   } catch (err) {
-    console.error("Update candidate contact failed:", err);
+    console.error("Set candidate LIVE failed:", err);
     const anyErr = err as { name?: unknown; message?: unknown; code?: unknown } | undefined;
     const debug: { name?: string; message?: string; code?: unknown } = {};
     if (anyErr && typeof anyErr.name === "string") debug.name = anyErr.name;
@@ -94,3 +101,4 @@ export async function PATCH(
     );
   }
 }
+

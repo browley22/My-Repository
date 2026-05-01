@@ -6,7 +6,8 @@ import RequisitionBoardClient from "@/components/RequisitionBoardClient";
 import { assertCanAccessSubmission, assertCanAccessRequisition } from "@/lib/submission-auth";
 import { createEventPayload } from "@/lib/create-event";
 import { ensureSubmissionOwnerIfNone } from "@/lib/submission-owner";
-import JobDescriptionModal from "@/components/JobDescriptionModal";
+import { AGENCY_LANES } from "@/lib/requisition-lanes";
+import RequisitionHeaderClient from "@/components/RequisitionHeaderClient";
 
 const prisma = new PrismaClient();
 
@@ -71,21 +72,20 @@ const submissionsWithResume = requisition.submissions.map((s: any) => ({
     : s.candidate,
 }));
 
+const submissionsVisible =
+  role === "CLIENT"
+    ? submissionsWithResume.filter(
+        (s: any) => s.candidate && (s.candidate as any).isLiveForClient
+      )
+    : submissionsWithResume;
+
 try {
   assertCanAccessRequisition(session, requisition.clientId);
 } catch {
   return <div>Access denied.</div>;
 }
 
-const agencyColumns = [
-  "SUBMITTED",
-  "UNDER_REVIEW",
-  "INTERVIEW_REQUESTED",
-  "OFFER_PENDING",
-  "OFFERED",
-  "CLOSED",
-  "DECLINED",
-] as const;
+const agencyColumns = AGENCY_LANES;
 
 // CLIENT: do not show a separate "Submitted to Client" column; map those submissions into "Submitted".
 const clientColumns = [
@@ -101,15 +101,13 @@ const columns = (role === "AGENCY" ? agencyColumns : clientColumns) as readonly 
 
 return (
 <div style={{ padding: 40 }}>
-  <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-    <JobDescriptionModal
-    title={requisition.title}
+  <RequisitionHeaderClient
     requisitionId={requisition.id}
+    initialTitle={requisition.title}
+    clientName={requisition.client.name}
     jobDescription={requisition.jobDescription || null}
+    role={role}
   />
-    <span style={{ fontSize: 12, color: "#64748b" }}>View JD</span>
-  </div>
-  <p style={{ marginTop: 0, marginBottom: 16 }}>Client: {requisition.client.name}</p>
 
   <hr />
 
@@ -118,7 +116,7 @@ return (
     requisitionId={requisition.id}
     requisitionTitle={requisition.title}
     columns={columns as unknown as string[]}
-    submissions={submissionsWithResume as any}
+    submissions={submissionsVisible as any}
     currentUserDisplayName={role === "AGENCY" ? ((session.user as any)?.name || (session.user as any)?.email) || undefined : undefined}
 
     onMove={async (submissionId: string, newStatus: string) => {

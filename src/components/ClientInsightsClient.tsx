@@ -2,6 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { DndContext, closestCenter, type DragEndEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 function formatTimeAgo(ms: number): string {
   const seconds = Math.floor((Date.now() - ms) / 1000);
@@ -17,13 +25,27 @@ function formatTimeAgo(ms: number): string {
 }
 
 type AccountTabId =
-  | "Overview"
-  | "Consultants"
-  | "Job Orders"
-  | "Renewals"
+  | "PERFORMANCE"
+  | "CONSULTANTS"
+  | "JOB_ORDERS"
+  | "RENEWALS"
   | "KEY_STAKEHOLDERS"
-  | "Signals"
-  | "Briefing";
+  | "SIGNALS"
+  | "OPPORTUNITIES"
+  | "RISK"
+  | "BRIEFING";
+
+const DEFAULT_TABS: { tabId: AccountTabId; label: string }[] = [
+  { tabId: "PERFORMANCE", label: "Performance" },
+  { tabId: "CONSULTANTS", label: "Consultants" },
+  { tabId: "JOB_ORDERS", label: "Job Orders" },
+  { tabId: "RENEWALS", label: "Renewals" },
+  { tabId: "KEY_STAKEHOLDERS", label: "Key Stakeholders" },
+  { tabId: "SIGNALS", label: "Signals" },
+  { tabId: "OPPORTUNITIES", label: "Opportunities" },
+  { tabId: "RISK", label: "Risk" },
+  { tabId: "BRIEFING", label: "Briefing" },
+];
 
 type Props = {
   clientName: string;
@@ -57,6 +79,78 @@ type EngagementPulseSettings = {
   automationEnabled: boolean;
   nextPulseAt: number | null;
 };
+
+type SortableTabProps = {
+  tab: AccountTabId;
+  label: string;
+  selected: boolean;
+  base: CSSProperties;
+  activeStyle: CSSProperties;
+  inactiveStyle: CSSProperties;
+  hoverStyle: CSSProperties;
+  isHovered: boolean;
+  onClick: (tab: AccountTabId) => void;
+  onHoverChange: (tab: AccountTabId | null) => void;
+};
+
+function SortableTab({
+  tab,
+  label,
+  selected,
+  base,
+  activeStyle,
+  inactiveStyle,
+  hoverStyle,
+  isHovered,
+  onClick,
+  onHoverChange,
+}: SortableTabProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: tab,
+  });
+
+  const wrapperStyle: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    cursor: isDragging ? "grabbing" : "grab",
+  };
+
+  const buttonStyle: CSSProperties = {
+    ...base,
+    ...(selected ? activeStyle : inactiveStyle),
+    ...(!selected && isHovered ? hoverStyle : {}),
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+  };
+
+  const handleStyle: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingInline: 2,
+    cursor: isDragging ? "grabbing" : "grab",
+    color: "#94a3b8",
+    fontSize: 10,
+  };
+
+  return (
+    <div ref={setNodeRef} style={wrapperStyle}>
+      <button
+        type="button"
+        onClick={() => onClick(tab)}
+        onMouseEnter={() => onHoverChange(tab)}
+        onMouseLeave={() => onHoverChange(null)}
+        style={buttonStyle}
+      >
+        <span>{label}</span>
+        <span {...attributes} {...listeners} style={handleStyle} aria-label="Reorder tab">
+          ⋮⋮
+        </span>
+      </button>
+    </div>
+  );
+}
 
 const AI_SUMMARY_PLACEHOLDER =
   "Relationship stable. Engagement steady. Two consultants nearing renewal. Recommend proactive check-in.";
@@ -99,13 +193,17 @@ export default function ClientInsightsClient({
   pastRequisitions,
   recentActivity,
 }: Props) {
-  const [accountTab, setAccountTab] = React.useState<AccountTabId>("Overview");
+  const [accountTab, setAccountTab] = React.useState<AccountTabId>("PERFORMANCE");
 
   const [consultantsOpenSection, setConsultantsOpenSection] = React.useState<"current" | "previous" | null>("current");
   const [jobOrdersOpenSection, setJobOrdersOpenSection] = React.useState<"current" | "previous" | null>("current");
   const [showBriefing, setShowBriefing] = React.useState(false);
   const [hoverKey, setHoverKey] = React.useState<string | null>(null);
   const [hoveredTab, setHoveredTab] = React.useState<string | null>(null);
+  const [healthExpanded, setHealthExpanded] = React.useState(false);
+  const [orderedTabs, setOrderedTabs] = React.useState<AccountTabId[]>(
+    DEFAULT_TABS.map((t) => t.tabId)
+  );
 
   // Local-only hybrid pulse configuration (no persistence yet).
   const [pulseSettings, setPulseSettings] = React.useState<EngagementPulseSettings>({
@@ -149,6 +247,57 @@ export default function ClientInsightsClient({
   for (let i = 0; attentionSignals.length < 3 && i < attentionPlaceholders.length; i += 1) {
     attentionSignals.push(attentionPlaceholders[i]);
   }
+
+  const healthBg =
+    ACCOUNT_STATUS_LABEL === "Healthy"
+      ? "#ecfdf3" // green-50
+      : ACCOUNT_STATUS_LABEL === "Watch"
+      ? "#fffbeb" // yellow-50
+      : ACCOUNT_STATUS_LABEL === "At Risk"
+      ? "#fef2f2" // red-50
+      : "#f8fafc";
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem("client360_tab_order");
+      if (raw) {
+        const stored = JSON.parse(raw) as AccountTabId[];
+        const base: AccountTabId[] = DEFAULT_TABS.map((t) => t.tabId);
+        const inStoredOrder = stored.filter((id) => base.includes(id));
+        const missing = base.filter((id) => !stored.includes(id));
+        const merged = [...inStoredOrder, ...missing];
+        setOrderedTabs(merged);
+        if (merged.length > 0) {
+          setAccountTab(merged[0]);
+        }
+      }
+    } catch {
+      // ignore bad localStorage
+    }
+  }, [clientId]);
+
+  const handleTabDragEnd = React.useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      setOrderedTabs((tabs) => {
+        const oldIndex = tabs.indexOf(active.id as AccountTabId);
+        const newIndex = tabs.indexOf(over.id as AccountTabId);
+        if (oldIndex === -1 || newIndex === -1) return tabs;
+        const next = arrayMove(tabs, oldIndex, newIndex);
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem("client360_tab_order", JSON.stringify(next));
+          } catch {
+            // ignore write errors
+          }
+        }
+        return next;
+      });
+    },
+    []
+  );
 
   const engagementRightColumn = (
     <div
@@ -241,15 +390,7 @@ export default function ClientInsightsClient({
     </div>
   );
 
-  const accountTabs: AccountTabId[] = [
-    "Overview",
-    "Consultants",
-    "Job Orders",
-    "Renewals",
-    "KEY_STAKEHOLDERS",
-    "Signals",
-    "Briefing",
-  ];
+  const accountTabs: AccountTabId[] = DEFAULT_TABS.map((t) => t.tabId);
 
   return (
     <>
@@ -261,9 +402,7 @@ export default function ClientInsightsClient({
           justifyContent: "space-between",
           flexWrap: "wrap",
           gap: 12,
-          marginBottom: 20,
-          paddingBottom: 12,
-          borderBottom: "1px solid #e2e8f0",
+          paddingBottom: 8,
         }}
       >
         <div>
@@ -282,6 +421,78 @@ export default function ClientInsightsClient({
         >
           View in CRM ↗
         </span>
+      </div>
+
+      {/* Account Health Banner */}
+      <div
+        style={{
+          marginTop: 8,
+          marginBottom: 16,
+          borderRadius: 8,
+          background: healthBg,
+          border: "1px solid rgba(148, 163, 184, 0.35)",
+          overflow: "hidden",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setHealthExpanded((prev) => !prev)}
+          style={{
+            width: "100%",
+            padding: "10px 14px",
+            border: "none",
+            background: "transparent",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            cursor: "pointer",
+          }}
+        >
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, textAlign: "left" }}>
+            <span style={{ fontSize: 11, color: "#64748b" }}>Account Status</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+              {ACCOUNT_STATUS_LABEL}
+            </span>
+            <span style={{ fontSize: 11, color: "#64748b" }}>
+              Overall relationship health based on recent activity and delivery.
+            </span>
+          </div>
+          <span
+            aria-hidden="true"
+            style={{
+              fontSize: 12,
+              color: "#64748b",
+              marginLeft: 12,
+            }}
+          >
+            {healthExpanded ? "▾" : "▸"}
+          </span>
+        </button>
+        <div
+          style={{
+            maxHeight: healthExpanded ? 160 : 0,
+            opacity: healthExpanded ? 1 : 0,
+            overflow: "hidden",
+            transition: "max-height 200ms ease, opacity 160ms ease",
+          }}
+        >
+          <div style={{ padding: healthExpanded ? "4px 14px 10px" : "0 14px", fontSize: 12, color: "#0f172a" }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Why this status</div>
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              <li style={{ marginBottom: 2 }}>
+                Recent activity:{" "}
+                {recentActivity.length === 0 ? "no recent client touches detected." : "recent interactions logged."}
+              </li>
+              <li style={{ marginBottom: 2 }}>
+                Open demand: {openRequisitions.length} open role
+                {openRequisitions.length === 1 ? "" : "s"} indicating ongoing partnership.
+              </li>
+              <li>
+                Delivery track record: {summary.placements > 0 ? "placements delivered for this client." : "no placements yet; early-stage account."}
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
 
       {/* B) Single Narrative Insight Strip — AI Summary card */}
@@ -304,28 +515,6 @@ export default function ClientInsightsClient({
               Health: — · Last touch: {recentActivity.length > 0 ? formatTimeAgo(recentActivity[0].timestamp) : "—"} · Next milestone: —
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button
-                type="button"
-                onMouseEnter={() => setHoverKey("btn-checkin")}
-                onMouseLeave={() => setHoverKey(null)}
-                style={pillStyle("btn-checkin", {
-                  borderRadius: 6,
-                })}
-              >
-              Schedule check-in
-            </button>
-            <button
-              type="button"
-              onMouseEnter={() => setHoverKey("btn-risks")}
-              onMouseLeave={() => setHoverKey(null)}
-              style={pillStyle("btn-risks", {
-                borderRadius: 6,
-              })}
-            >
-              View risks
-            </button>
-          </div>
         </div>
       </div>
       {/* Account details tabs */}
@@ -336,66 +525,70 @@ export default function ClientInsightsClient({
           marginTop: 4,
         }}
       >
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {accountTabs.map((tab) => {
-            const selected = tab === accountTab;
-            const key = `tab-${tab}`;
-            const isHovered = hoveredTab === tab;
+        <DndContext collisionDetection={closestCenter} onDragEnd={handleTabDragEnd}>
+          <SortableContext items={orderedTabs} strategy={horizontalListSortingStrategy}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {orderedTabs.map((tabId) => {
+                const tabDef = DEFAULT_TABS.find((t) => t.tabId === tabId);
+                if (!tabDef) return null;
+                const selected = tabId === accountTab;
+                const key = `tab-${tabId}`;
+                const isHovered = hoveredTab === tabId;
+                const label = tabDef.label;
 
-            const label = tab === "KEY_STAKEHOLDERS" ? "Key Stakeholders" : tab;
+                const base: CSSProperties = {
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  userSelect: "none",
+                  transition: "background 120ms ease, border-color 120ms ease",
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                };
 
-            const base: CSSProperties = {
-              padding: "6px 10px",
-              borderRadius: 6,
-              fontSize: 12,
-              cursor: "pointer",
-              userSelect: "none",
-              transition: "background 120ms ease, border-color 120ms ease",
-              borderWidth: 1,
-              borderStyle: "solid",
-            };
+                const activeStyle: CSSProperties = {
+                  background: "#f1f5f9",
+                  borderColor: "#e2e8f0",
+                  color: "#0f172a",
+                  fontWeight: 600,
+                };
 
-            const activeStyle: CSSProperties = {
-              background: "#f1f5f9",
-              borderColor: "#e2e8f0",
-              color: "#0f172a",
-              fontWeight: 600,
-            };
+                const inactiveStyle: CSSProperties = {
+                  background: "transparent",
+                  borderColor: "transparent",
+                  color: "#64748b",
+                  fontWeight: 400,
+                };
 
-            const inactiveStyle: CSSProperties = {
-              background: "transparent",
-              borderColor: "transparent",
-              color: "#64748b",
-              fontWeight: 400,
-            };
+                const hoverStyle: CSSProperties = {
+                  background: hoverBg,
+                  borderColor: hoverBorder,
+                };
 
-            const hoverStyle: CSSProperties = {
-              background: hoverBg,
-              borderColor: hoverBorder,
-            };
-
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setAccountTab(tab)}
-                onMouseEnter={() => setHoveredTab(tab)}
-                onMouseLeave={() => setHoveredTab(null)}
-                style={{
-                  ...base,
-                  ...(selected ? activeStyle : inactiveStyle),
-                  ...(!selected && isHovered ? hoverStyle : {}),
-                }}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
+                return (
+                  <SortableTab
+                    key={key}
+                    tab={tabId}
+                    label={label}
+                    selected={selected}
+                    base={base}
+                    activeStyle={activeStyle}
+                    inactiveStyle={inactiveStyle}
+                    hoverStyle={hoverStyle}
+                    isHovered={isHovered}
+                    onClick={setAccountTab}
+                    onHoverChange={setHoveredTab}
+                  />
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
-      {/* Overview tab */}
-      {accountTab === "Overview" && (
+      {/* Performance tab (formerly Overview) */}
+      {accountTab === "PERFORMANCE" && (
         <div
           className="client360-two-col"
           style={{
@@ -408,35 +601,6 @@ export default function ClientInsightsClient({
         >
           {/* Left: Account status + Performance snapshot + light context */}
           <div>
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 10,
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <div
-                style={{
-                  ...pillBase,
-                  padding: "8px 12px",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "flex-start",
-                  gap: 2,
-                }}
-              >
-                <span style={{ fontSize: 11, color: "#64748b" }}>Account Status</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
-                  {ACCOUNT_STATUS_LABEL}
-                </span>
-                <span style={{ fontSize: 11, color: "#64748b" }}>
-                  Engagement: {ENGAGEMENT_LABEL} · Risk: {RISK_LABEL}
-                </span>
-              </div>
-            </div>
-
             {/* Performance: 4 compact stat blocks (one calm band) */}
             <section
               className="client360-perf"
@@ -502,7 +666,7 @@ export default function ClientInsightsClient({
       )}
 
       {/* Consultants tab */}
-      {accountTab === "Consultants" && (
+      {accountTab === "CONSULTANTS" && (
         <div
           className="client360-two-col"
           style={{
@@ -643,7 +807,7 @@ export default function ClientInsightsClient({
       )}
 
       {/* Job Orders tab */}
-      {accountTab === "Job Orders" && (
+      {accountTab === "JOB_ORDERS" && (
         <div
           className="client360-two-col"
           style={{
@@ -814,7 +978,7 @@ export default function ClientInsightsClient({
       )}
 
       {/* Renewals tab */}
-      {accountTab === "Renewals" && (
+      {accountTab === "RENEWALS" && (
         <div
           className="client360-two-col"
           style={{
@@ -845,6 +1009,105 @@ export default function ClientInsightsClient({
                 Renewal Timeline
               </h2>
               <p style={{ fontSize: 12, color: "#64748b", margin: 0 }}>No renewal dates available.</p>
+            </section>
+          </div>
+          {engagementRightColumn}
+        </div>
+      )}
+
+      {/* Risk tab */}
+      {accountTab === "RISK" && (
+        <div
+          className="client360-two-col"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 360px)",
+            gap: 24,
+            alignItems: "flex-start",
+            marginBottom: 24,
+          }}
+        >
+          <div>
+            <section
+              style={{
+                padding: "12px 14px",
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#64748b",
+                  margin: "0 0 8px 0",
+                }}
+              >
+                Risk Overview
+              </h3>
+              <p style={{ fontSize: 12, color: "#475569", margin: "0 0 8px 0" }}>
+                Risk level:{" "}
+                <span style={{ fontWeight: 600 }}>
+                  {summary.placements > 0 ? "Medium" : "Low"}
+                </span>
+              </p>
+              <p style={{ fontSize: 11, color: "#94a3b8", margin: "0 0 12px 0" }}>
+                Last updated: {formatToday()}
+              </p>
+              <div style={{ fontSize: 12, color: "#0f172a" }}>
+                <div style={{ fontWeight: 600, marginBottom: 6 }}>Risk signals</div>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  <li style={{ marginBottom: 4 }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        background: "#fef3c7",
+                        color: "#92400e",
+                        marginRight: 6,
+                      }}
+                    >
+                      MED
+                    </span>
+                    Limited recent activity — consider a proactive touchpoint.
+                  </li>
+                  <li style={{ marginBottom: 4 }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        background: "#dcfce7",
+                        color: "#166534",
+                        marginRight: 6,
+                      }}
+                    >
+                      LOW
+                    </span>
+                    Stable placements delivered; relationship appears steady.
+                  </li>
+                  <li>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        background: "#fee2e2",
+                        color: "#b91c1c",
+                        marginRight: 6,
+                      }}
+                    >
+                      HIGH
+                    </span>
+                    Renewal timing unclear — align on contract extensions early.
+                  </li>
+                </ul>
+              </div>
             </section>
           </div>
           {engagementRightColumn}
@@ -890,7 +1153,7 @@ export default function ClientInsightsClient({
       )}
 
       {/* Signals tab */}
-      {accountTab === "Signals" && (
+      {accountTab === "SIGNALS" && (
         <div
           className="client360-two-col"
           style={{
@@ -951,8 +1214,229 @@ export default function ClientInsightsClient({
         </div>
       )}
 
+      {/* Opportunities tab */}
+      {accountTab === "OPPORTUNITIES" && (
+        <div
+          className="client360-two-col"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 360px)",
+            gap: 24,
+            alignItems: "flex-start",
+            marginBottom: 24,
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gap: 16,
+            }}
+          >
+            {/* AI Opportunity Highlights */}
+            <section
+              style={{
+                padding: "12px 14px",
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#64748b",
+                  margin: "0 0 8px 0",
+                }}
+              >
+                AI Opportunity Highlights
+              </h3>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#0f172a" }}>
+                <li style={{ marginBottom: 6 }}>
+                  <div style={{ fontWeight: 600 }}>Renewal expansion on data team</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                    Renewal timing and open data roles suggest appetite for additional consultants.
+                  </div>
+                  <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        background: "#dcfce7",
+                        color: "#166534",
+                      }}
+                    >
+                      HIGH
+                    </span>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>
+                      Suggested action: propose 1–2 additional analysts tied to upcoming projects.
+                    </span>
+                  </div>
+                </li>
+                <li style={{ marginBottom: 6 }}>
+                  <div style={{ fontWeight: 600 }}>Leadership visibility session</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                    Recent stakeholder changes create a window to re-introduce your team’s impact.
+                  </div>
+                  <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        background: "#fef3c7",
+                        color: "#92400e",
+                      }}
+                    >
+                      MED
+                    </span>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>
+                      Suggested action: share a short outcomes recap with new leaders.
+                    </span>
+                  </div>
+                </li>
+                <li>
+                  <div style={{ fontWeight: 600 }}>Backfill + pipeline bundling</div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                    Historic attrition plus open reqs signal demand for a deeper bench on key roles.
+                  </div>
+                  <div style={{ marginTop: 4, display: "flex", gap: 6, alignItems: "center" }}>
+                    <span
+                      style={{
+                        display: "inline-block",
+                        padding: "2px 6px",
+                        borderRadius: 999,
+                        fontSize: 10,
+                        background: "#e5e7eb",
+                        color: "#374151",
+                      }}
+                    >
+                      LOW
+                    </span>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>
+                      Suggested action: package 3–4 pre-vetted profiles as a flexible bench.
+                    </span>
+                  </div>
+                </li>
+              </ul>
+            </section>
+
+            {/* Connection Map */}
+            <section
+              style={{
+                padding: "12px 14px",
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#64748b",
+                  margin: "0 0 8px 0",
+                }}
+              >
+                Connection Map
+              </h3>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#0f172a" }}>
+                <li style={{ marginBottom: 4 }}>
+                  Industry & demand: hiring trend in analytics + digital projects → higher project load next
+                  quarter.
+                </li>
+                <li style={{ marginBottom: 4 }}>
+                  CRM notes: last exec review highlighted delivery quality and openness to broader partnership.
+                </li>
+                <li style={{ marginBottom: 4 }}>
+                  Your services: strong fit for analytics pods, project managers, and adoption/change resources.
+                </li>
+                <li>
+                  Bridge: bundle staffing + light consulting to de-risk upcoming initiatives.
+                </li>
+              </ul>
+            </section>
+
+            {/* Recommended Plays */}
+            <section
+              style={{
+                padding: "12px 14px",
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#64748b",
+                  margin: "0 0 8px 0",
+                }}
+              >
+                Recommended Plays
+              </h3>
+              <div style={{ display: "grid", gap: 8, fontSize: 12, color: "#0f172a" }}>
+                <div
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Expansion lane</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>
+                    Trigger: renewals + strong delivery; Pitch: add a small squad to de-risk roadmap.
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                    Next step: draft a 2–3 slide expansion concept.
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>New role wedge</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>
+                    Trigger: emerging initiatives; Pitch: pilot 1 specialist for a critical upcoming project.
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                    Next step: identify 1–2 high-fit candidates and outline a 60-day pilot.
+                  </div>
+                </div>
+                <div
+                  style={{
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 2 }}>Consulting upsell</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>
+                    Trigger: recurring process gaps; Pitch: short consulting engagement to tune intake + delivery.
+                  </div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                    Next step: sketch a lightweight 4–6 week engagement outline.
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+          {engagementRightColumn}
+        </div>
+      )}
+
       {/* Briefing tab */}
-      {accountTab === "Briefing" && (
+      {accountTab === "BRIEFING" && (
         <div
           className="client360-two-col"
           style={{

@@ -433,17 +433,15 @@ export default function CandidateDetailSheet({
       aria-hidden={!open}
     >
         <div className="flex items-start justify-between border-b p-4">
-          <div>
+          <div className="flex-1 min-w-0">
             <h2 className="text-xl font-semibold">{name}</h2>
             <p className="text-sm text-gray-500">{subtitle}</p>
             <section className="mt-2">
-              <div className="w-full flex items-center justify-between">
-                <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-gray-700">Contact Information TEST</h3>
-                </div>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-gray-700">Contact Information</h3>
                 {role === "AGENCY" && (
                   <div
-                    className="shrink-0 flex items-center gap-2"
+                    className="flex items-center gap-2"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
@@ -595,12 +593,10 @@ export default function CandidateDetailSheet({
               Status: <span className="font-medium">{submission.status}</span>
             </p>
             )}
-            <div className="w-full flex items-center justify-between mt-2">
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-gray-700">Owner</h3>
-              </div>
+            <div className="flex items-center justify-between mt-2">
+              <h3 className="text-sm font-semibold text-gray-700">Owner</h3>
               {role === "AGENCY" && onSetOwner && (
-                <div className="shrink-0 flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <input
                     type="text"
                     value={ownerInput}
@@ -651,76 +647,74 @@ export default function CandidateDetailSheet({
           {/* AI Fit - AGENCY only */}
           {role === "AGENCY" && (
           <section>
-            <div className="w-full flex items-center justify-between mb-2">
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-gray-700">AI Fit</h3>
-              </div>
-              <div className="shrink-0 flex items-center gap-2">
-              {(!submission?.evaluatedAt && !localEvaluation) ? (
-                <button
-                  type="button"
-                  className="rounded-md bg-sky-600 text-white px-3 py-1.5 text-xs hover:bg-sky-700 disabled:opacity-50"
-                  disabled={busy !== null || evaluationLoading}
-                  onClick={async () => {
-                    if (!submission?.id) return;
-                    setEvaluationError(null);
-                    setEvaluationLoading(true);
-                    setBusy("evaluate");
-                    try {
-                      const res = await fetch(`/api/submissions/${submission.id}/evaluate`, {
-                        method: "POST",
-                      });
-                      if (!res.ok) {
-                        const data = await res.json().catch(() => ({}));
-                        setEvaluationError(data.error || "Evaluation failed");
-                        return;
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-gray-700">AI Fit</h3>
+              <div className="flex items-center gap-2">
+                {(!submission?.evaluatedAt && !localEvaluation) ? (
+                  <button
+                    type="button"
+                    className="rounded-md bg-sky-600 text-white px-3 py-1.5 text-xs hover:bg-sky-700 disabled:opacity-50"
+                    disabled={busy !== null || evaluationLoading}
+                    onClick={async () => {
+                      if (!submission?.id) return;
+                      setEvaluationError(null);
+                      setEvaluationLoading(true);
+                      setBusy("evaluate");
+                      try {
+                        const res = await fetch(`/api/submissions/${submission.id}/evaluate`, {
+                          method: "POST",
+                        });
+                        if (!res.ok) {
+                          const data = await res.json().catch(() => ({}));
+                          setEvaluationError(data.error || "Evaluation failed");
+                          return;
+                        }
+                        const data = await res.json();
+                        setLocalEvaluation(data.evaluation);
+                        router.refresh();
+                      } catch (err) {
+                        setEvaluationError("Evaluation failed");
+                      } finally {
+                        setEvaluationLoading(false);
+                        setBusy(null);
                       }
-                      const data = await res.json();
-                      setLocalEvaluation(data.evaluation);
-                      router.refresh();
-                    } catch (err) {
-                      setEvaluationError("Evaluation failed");
-                    } finally {
-                      setEvaluationLoading(false);
-                      setBusy(null);
-                    }
-                  }}
-                >
-                  {evaluationLoading ? "Evaluating..." : "Evaluate Fit"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
-                  disabled={busy !== null || evaluationLoading}
-                  onClick={async () => {
-                    if (!submission?.id) return;
-                    setEvaluationError(null);
-                    setEvaluationLoading(true);
-                    setBusy("evaluate");
-                    try {
-                      const res = await fetch(`/api/submissions/${submission.id}/evaluate`, {
-                        method: "POST",
-                      });
-                      if (!res.ok) {
-                        const data = await res.json().catch(() => ({}));
-                        setEvaluationError(data.error || "Evaluation failed");
-                        return;
+                    }}
+                  >
+                    {evaluationLoading ? "Evaluating..." : "Evaluate Fit"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50"
+                    disabled={busy !== null || evaluationLoading}
+                    onClick={async () => {
+                      if (!submission?.id) return;
+                      setEvaluationError(null);
+                      setEvaluationLoading(true);
+                      setBusy("evaluate");
+                      try {
+                        const res = await fetch(`/api/submissions/${submission.id}/evaluate`, {
+                          method: "POST",
+                        });
+                        if (!res.ok) {
+                          const data = await res.json().catch(() => ({}));
+                          setEvaluationError(data.error || "Evaluation failed");
+                          return;
+                        }
+                        const data = await res.json();
+                        setLocalEvaluation(data.evaluation);
+                        router.refresh();
+                      } catch (err) {
+                        setEvaluationError("Evaluation failed");
+                      } finally {
+                        setEvaluationLoading(false);
+                        setBusy(null);
                       }
-                      const data = await res.json();
-                      setLocalEvaluation(data.evaluation);
-                      router.refresh();
-                    } catch (err) {
-                      setEvaluationError("Evaluation failed");
-                    } finally {
-                      setEvaluationLoading(false);
-                      setBusy(null);
-                    }
-                  }}
-                >
-                  {evaluationLoading ? "Re-running..." : "Re-run AI"}
-                </button>
-              )}
+                    }}
+                  >
+                    {evaluationLoading ? "Re-running..." : "Re-run AI"}
+                  </button>
+                )}
               </div>
             </div>
             {evaluationError && (

@@ -34,6 +34,9 @@ type Submission = {
     summary?: string | null;
     resumeUrl?: string | null;
     resumeText?: string | null;
+    isLiveForClient?: boolean | null;
+    liveAt?: string | null;
+    liveByUserId?: string | null;
   };
 };
 
@@ -326,6 +329,12 @@ function DraggableCard({
   const [nextActionOverride, setNextActionOverride] = React.useState<string | null>(null);
 
   const candidateId = submission.candidate?.id ?? null;
+  const [isLiveForClient, setIsLiveForClient] = React.useState<boolean>(
+    Boolean(submission.candidate?.isLiveForClient)
+  );
+  const [showLiveModal, setShowLiveModal] = React.useState(false);
+  const [liveSaving, setLiveSaving] = React.useState(false);
+  const [liveError, setLiveError] = React.useState<string | null>(null);
   const [isFileDragging, setIsFileDragging] = React.useState(false);
   const [uploadStatus, setUploadStatus] = React.useState<null | "uploading" | "success" | "error">(null);
   const [uploadMessage, setUploadMessage] = React.useState("");
@@ -1289,52 +1298,97 @@ function DraggableCard({
             </div>
           </div>
           {submission.candidate.title && (
-  <div style={{ fontSize: 12, color: "#6b7280" }}>
-    {submission.candidate.title}
-  </div>
-)}
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
+              {submission.candidate.title}
+            </div>
+          )}
 
-{submission.candidate.location && (
-  <div style={{ fontSize: 12, color: "#9ca3af" }}>
-    📍 {submission.candidate.location}
-  </div>
-)}
+          {submission.candidate.location && (
+            <div style={{ fontSize: 12, color: "#9ca3af" }}>
+              📍 {submission.candidate.location}
+            </div>
+          )}
 
-{submission.candidate.email && (
-  <div
-    style={{
-      fontSize: 12,
-      color: "#9ca3af",
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      maxWidth: 180,
-    }}
-    title={submission.candidate.email}
-  >
-    ✉️{" "}
-    <a
-      href={`mailto:${submission.candidate.email}`}
-      style={{ color: "inherit", textDecoration: "underline" }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {submission.candidate.email}
-    </a>
-  </div>
-)}
+          {submission.candidate.email && (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#9ca3af",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                maxWidth: 180,
+              }}
+              title={submission.candidate.email}
+            >
+              ✉️{" "}
+              <a
+                href={`mailto:${submission.candidate.email}`}
+                style={{ color: "inherit", textDecoration: "underline" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {submission.candidate.email}
+              </a>
+            </div>
+          )}
 
-{submission.candidate.phone && (
-  <div style={{ fontSize: 12, color: "#9ca3af" }}>
-    📞{" "}
-    <a
-      href={`tel:${submission.candidate.phone}`}
-      style={{ color: "inherit", textDecoration: "underline" }}
-      onClick={(e) => e.stopPropagation()}
-    >
-      {submission.candidate.phone}
-    </a>
-  </div>
-)}
+          {submission.candidate.phone && (
+            <div style={{ fontSize: 12, color: "#9ca3af" }}>
+              📞{" "}
+              <a
+                href={`tel:${submission.candidate.phone}`}
+                style={{ color: "inherit", textDecoration: "underline" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {submission.candidate.phone}
+              </a>
+            </div>
+          )}
+
+          {role === "AGENCY" && candidateId && (
+            <div style={{ marginTop: 6, fontSize: 11 }}>
+              {isLiveForClient ? (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: "#ecfdf3",
+                    border: "1px solid #bbf7d0",
+                    color: "#166534",
+                    fontWeight: 600,
+                  }}
+                >
+                  LIVE
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLiveError(null);
+                    setShowLiveModal(true);
+                  }}
+                  style={{
+                    fontSize: 11,
+                    padding: "4px 8px",
+                    borderRadius: 999,
+                    border: "1px solid #e5e7eb",
+                    background: "#ffffff",
+                    color: "#0369a1",
+                    cursor: "pointer",
+                  }}
+                >
+                  Make LIVE
+                </button>
+              )}
+              {liveError && (
+                <div style={{ marginTop: 2, color: "#b91c1c", fontSize: 11 }}>{liveError}</div>
+              )}
+            </div>
+          )}
 
       <div
         style={{
@@ -1681,6 +1735,127 @@ function DraggableCard({
           overlayRect={summaryOverlayRect}
           onClose={closeSummaryOverlay}
         />,
+        document.body
+      )}
+    {role === "AGENCY" &&
+      showLiveModal &&
+      typeof document !== "undefined" &&
+      createPortal(
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm make candidate LIVE"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(15,23,42,0.45)",
+          }}
+          onClick={() => {
+            if (!liveSaving) setShowLiveModal(false);
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              background: "#ffffff",
+              borderRadius: 10,
+              border: "1px solid #e5e7eb",
+              boxShadow: "0 18px 40px rgba(15,23,42,0.25)",
+              padding: 16,
+              fontSize: 13,
+              color: "#0f172a",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>
+              Make candidate LIVE for client?
+            </div>
+            <p style={{ margin: "0 0 12px 0", fontSize: 13, color: "#475569" }}>
+              Please confirm you want to make this candidate LIVE for the client. This will make the
+              candidate visible to the client.
+            </p>
+            {liveError && (
+              <div
+                style={{
+                  marginBottom: 8,
+                  padding: "6px 8px",
+                  borderRadius: 6,
+                  border: "1px solid #fecaca",
+                  background: "#fef2f2",
+                  color: "#b91c1c",
+                  fontSize: 12,
+                }}
+              >
+                {liveError}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!liveSaving) setShowLiveModal(false);
+                }}
+                style={{
+                  fontSize: 12,
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "1px solid #e5e7eb",
+                  background: "#f9fafb",
+                  color: "#4b5563",
+                  cursor: liveSaving ? "default" : "pointer",
+                }}
+                disabled={liveSaving}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!candidateId || liveSaving) return;
+                  setLiveSaving(true);
+                  setLiveError(null);
+                  try {
+                    const res = await fetch(`/api/candidates/${candidateId}/live`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ isLive: true }),
+                    });
+                    if (!res.ok) {
+                      const data = await res.json().catch(() => ({}));
+                      throw new Error(data.error || "Failed to make candidate LIVE");
+                    }
+                    setIsLiveForClient(true);
+                    setShowLiveModal(false);
+                  } catch (err) {
+                    setLiveError(
+                      err instanceof Error ? err.message : "Failed to make candidate LIVE"
+                    );
+                  } finally {
+                    setLiveSaving(false);
+                  }
+                }}
+                style={{
+                  fontSize: 12,
+                  padding: "4px 12px",
+                  borderRadius: 6,
+                  border: "1px solid #0f766e",
+                  background: "#0f766e",
+                  color: "#ffffff",
+                  cursor: liveSaving ? "default" : "pointer",
+                  opacity: liveSaving ? 0.7 : 1,
+                }}
+                disabled={liveSaving || !candidateId}
+              >
+                {liveSaving ? "Saving…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
     </>

@@ -41,10 +41,12 @@ enum DeclineReason {
 
 model Client {
   id           String        @id @default(cuid())
-  name         String
+  name         String        @unique
+  status       String        @default("ACTIVE")
   users        User[]
   requisitions Requisition[]
   createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 }
 
 model User {
@@ -90,6 +92,9 @@ model Candidate {
   resumeTextUpdatedAt        DateTime?    // when resumeText was last set
   candidateSummaryText       String?   // freeform candidate summary text (card UI)
   candidateSummaryUpdatedAt  DateTime? // when candidateSummaryText was last set
+  isLiveForClient            Boolean       @default(false)
+  liveAt                     DateTime?
+  liveByUserId               String?
   submissions                Submission[]
   createdAt                  DateTime      @default(now())
 }
